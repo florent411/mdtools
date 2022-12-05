@@ -1,0 +1,10 @@
+Metadata-Version: 2.1
+Name: mdtools
+Version: 0.1
+Summary: Extra tools used for the analysis of my MD and OPES simulations
+Home-page: http://github.com/florent411/mdtools
+Author: Florent Smit
+Author-email: smitflorent@proton.me
+License: None
+Requires-Python: >=3.6
+License-File: LICENCE

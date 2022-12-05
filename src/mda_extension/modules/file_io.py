@@ -1,0 +1,122 @@
+#!/usr/bin/env python 
+
+''' File in/out '''
+
+import pandas as pd
+
+def read_colvar(root, walker_paths, colvar, labels=None, verbose=False):
+    ''' Read COLVAR file(s) into dataframe. '''
+
+    n_walkers = len(walker_paths)
+
+    # Catch None values
+    if labels == None:
+        labels = [*range(n_walkers)]
+    elif type(labels) is not list:
+        labels = [labels]
+
+    # If you have one label for multiple universes, use it as a prefix.
+    if len(labels) == 1 and n_walkers != 1:
+        labels = [f"{labels[0]}{i}" for i in range(n_walkers)]
+
+    if n_walkers == 1:
+        # Get the names of the columns
+        with open(f"{root}/{colvar}", "r") as file:
+            first_line = file.readline()            
+        column_names = first_line.strip().split(" ")[2:]
+
+        print(f"\t-> ./{root}/{colvar}...", end="") if verbose else 0
+        df = pd.read_csv(f"{root}/{colvar}", names=column_names, delim_whitespace=True, comment="#")
+        
+        # Add label and frame number
+        df['origin'] = labels[0]
+        df['frame'] = df.index
+
+        print(f"done") if verbose else 0
+
+    elif n_walkers > 1:      
+        print(f"\t-> ./walker{','.join([str(i) for i in range(n_walkers)])}/COLVAR (combining {n_walkers} walkers)...", end="") if verbose else 0
+        
+        # Load the dataframe for each walker
+        colvar_list = []
+        for i, path in enumerate(walker_paths):
+
+            # Get the names of the columns
+            with open(f"./{root}/{path}/{colvar}.{i}", "r") as file:
+                first_line = file.readline()            
+            column_names = first_line.strip().split(" ")[2:]
+
+            # Add walker number
+            walker_df = pd.read_csv(f"./{root}/{path}/{colvar}.{i}", names=column_names, delim_whitespace=True, comment="#")
+            walker_df['origin'] = labels[i]
+    
+            # Add frame number
+            walker_df['frame'] = walker_df.index
+
+            colvar_list.append(walker_df)
+
+        # Add all walkers to the main dataframe and sort by
+        # This corresponds with `sort -gs walker*/COLVAR.* > walker0/COLVAR` in bash.
+        # df = pd.concat(colvar_list).sort_values(by=['time', 'walker'])
+        
+        # Unsorted to match concatenated trajectory
+        df = pd.concat(colvar_list)
+        print(f"done") if verbose else 0
+
+    else:
+        raise ValueError(f"Invalid number of walkers: ({n_walkers})")
+
+    return df
+
+def read_states(filename, verbose):
+    ''' Read states file and modify data to fit into two dataframes. 
+    1) states_data (dataframe containing the states data)
+    2) states_info (containing the extra information, such as zed value/biasfactor etc.'''
+
+    print(f"\t-> ./{filename}...", end="") if verbose else 0
+    df = pd.read_csv(filename, delim_whitespace=True, low_memory=False)
+
+    # Extracting all states from the dataframe and set the time as the index value
+    states_data = df[~df.iloc[:,1].isin(['SET', 'FIELDS'])]
+    states_data.columns = states_data.columns[2:].tolist() + 2 * ['na']
+    states_data = states_data.dropna(axis=1).astype({"time": int})
+    
+    # Getting additional information (all variables starting with #! SET)
+    states_info = df[df.iloc[:,1] == 'SET'].iloc[:,2:4]
+    states_info.columns = ['variable', 'value']
+    g = states_info.groupby(['variable']).cumcount()
+
+    # Pivot table. Now the unique variables are the column names
+    states_info = (states_info.set_index([g, 'variable'])['value']
+        .unstack(fill_value=0)
+        .reset_index(drop=True)
+        .rename_axis(None, axis=1))
+
+    # Add a column for the time values.
+    states_info['time'] = states_data['time'].unique()
+    print(f"done") if verbose else 0
+
+    return states_data, states_info
+
+def read_kernels(filename, verbose):
+    ''' Read KERNELS file into dataframe. '''
+
+    # Get the names of the columns
+    with open(filename, "r") as file:
+        first_line = file.readline()            
+    column_names = first_line.strip().split(" ")[2:]
+
+    print(f"\t-> ./{filename}...", end="") if verbose else 0
+    df = pd.read_csv(filename, names=column_names, delim_whitespace=True, comment="#")
+    print(f"done") if verbose else 0
+
+    return df
+
+def read_fes(filename, verbose):
+    ''' Read free energy data '''
+
+    print(f"\t-> ./{filename}...", end="") if verbose else 0
+    df = pd.read_csv(filename, sep="\s+")
+    print(f"done") if verbose else 0
+
+    return df    

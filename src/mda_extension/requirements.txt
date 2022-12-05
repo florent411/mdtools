@@ -1,0 +1,9 @@
+MDAnalysis
+numpy
+pandas
+scipy
+matplotlib
+seaborn
+checkarg
+pickle
+polars
