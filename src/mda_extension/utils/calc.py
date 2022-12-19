@@ -12,8 +12,8 @@ from MDAnalysis.analysis import rms, align
 import time
 
 # Included submodules
-import mda_extension.modules.tools as tools
-import mda_extension.modules.mp_functions as mpf
+import mda_extension.utils.tools as tools
+import mda_extension.utils.mp_functions as mpf
 
 def rmsd(universes, labels=None, selection='protein and name CA'):
     ''' Calculate root-mean square deviation (rmsd) 
@@ -32,7 +32,7 @@ def rmsd(universes, labels=None, selection='protein and name CA'):
 
     df_list = []
     for index, universe in tqdm(enumerate(universes), total=len(universes), desc='Universes', position=0):
-        R = rms.RMSD(universe, select="name CA").run().results.rmsd
+        R = rms.RMSD(universe, select=selection).run().results.rmsd
         rmsd = pd.DataFrame(R, columns = ['frame','time','rmsd'])
         rmsd['origin'] = labels[index]
 

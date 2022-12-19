@@ -11,9 +11,9 @@ from matplotlib import pyplot as plt
 from sklearn.neighbors import KernelDensity
 
 # Included submodules
-import plotter.modules.tools as tools
+from plotter.utils import tools
 
-def timeseries(df, variables, hue='origin', density=True, stride=10, rolling_avg=None, label_dict=None, palette="flare_r", save=True):
+def timeseries(df, variables, hue='origin', density=True, stride=10, rolling_avg=None, label_dict=None, palette="flare_r", save=True, **kwargs):
     ''' Plot cv(s) vs time using a time series (ts).'''
 
     # Setup default matplotlib values for layout
@@ -101,6 +101,15 @@ def timeseries(df, variables, hue='origin', density=True, stride=10, rolling_avg
             for ax in axes.reshape(-1):
                 ax.legend([],[], frameon=False)
 
+        # Set x-range
+        if "xrange" in kwargs:
+            axes[0][0].set_xlim(kwargs['xrange'])
+
+        # Set y-range
+        if "yrange" in kwargs:
+            axes[0][0].set_ylim(kwargs['yrange'])
+            axes[0][1].set_ylim(kwargs['yrange']) if density else 0
+
     # Make 2D scatterplot with the time in the colorbar. 
     elif len(variables) == 2:
 
@@ -167,11 +176,23 @@ def timeseries(df, variables, hue='origin', density=True, stride=10, rolling_avg
                         hue=hue, sort=False,
                         palette=palette, linewidth=0.1, alpha=0.8)
 
+        # Some more layout options
+
         # Add the proper labels for each axes
         if label_dict:
             axes[0][0].set(xlabel=label_dict[variables[0]], ylabel=label_dict[variables[1]])
         else:
             axes[0][0].set(xlabel=variables[0], ylabel=variables[1])
+
+        # Set x-range
+        if "xrange" in kwargs:
+            axes[0][0].set_xlim(kwargs['xrange'])
+            axes[1][0].set_xlim(kwargs['xrange']) if density else 0
+
+        # Set y-range
+        if "yrange" in kwargs:
+            axes[1][0].set_ylim(kwargs['yrange'])
+            axes[1][1].set_ylim(kwargs['yrange']) if density else 0
 
         # If only 1 walker, remove legend
         if not n_hues > 1:

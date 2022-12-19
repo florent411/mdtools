@@ -12,12 +12,14 @@ from MDAnalysis.analysis import align, rms
 # Guard module
 import checkarg.list as Guard
 
-# Included submodules
-from backpack.backpack import Backpack
+# Included submodules from the mdtools package
+from backpack.main import Backpack
 
-import mda_extension.modules.tools as tools
-import mda_extension.modules.file_io as fio
-import mda_extension.modules.calc as calc
+from opes_postprocessing.utils import calc_fes #, calc_div 
+
+from mda_extension.utils import tools
+from mda_extension.utils import file_io
+from mda_extension.utils import calc
 
 # Other constants
 kb = 1.38064852e-23 # Boltzman's constant in m^2 kg s^-2 K^-1
@@ -26,10 +28,10 @@ NA = 6.02214086e23 # Avogadro's constant in mol^-1
 class MD(mda.Universe):
     ''' Instance for an (unbiased) MD simulations. '''
 
-    def __init__(self, root=os.getcwd(),
+    def __init__(self, 
+                 root=os.getcwd(),
                  topology='run.pdb',
                  trajectory=None,
-                 align_on=None,
                  transform=False,
                  backpack='backpack.pkl',
                  verbose=False):
@@ -38,7 +40,6 @@ class MD(mda.Universe):
         # Set own variables
         self.root = root
         self.verbose = verbose
-        self.align_on = align_on
 
         # Take over variables from the mda.Universe superclass.
         if trajectory:
@@ -75,6 +76,7 @@ class MD(mda.Universe):
     def calc(self,
              key,
              *args,
+             alias=None,
              save=True,
              **kwargs):
         ''' Calculate anything for MD class '''
@@ -89,7 +91,11 @@ class MD(mda.Universe):
         value = dispatcher[key](*args, **kwargs)
         
         # Set as variable within the function and (if needed) save in the backpack
-        setattr(self, key, value)
+        if alias == None: 
+            setattr(self, key, value)
+        else:
+            setattr(self, alias, value)
+
         self.backpack.set(key, value) if save else 0
 
 
@@ -101,15 +107,13 @@ class OPES(MD):
                  topology='run.pdb',
                  trajectory=None,
                  walker_labels=None,
-                 align_on=None,
                  colvar='COLVAR',
-                 states='STATES',
+                 state='STATE',
                  kernels='KERNELS',
-                 fes=None,
                  verbose=False):
 
         # Take over variables from the MD superclass.
-        super().__init__(root, topology, trajectory, align_on, verbose=verbose)
+        super().__init__(root, topology, trajectory, verbose=verbose)
 
         # Turn into list if needed.
         if trajectory:
@@ -131,16 +135,9 @@ class OPES(MD):
             
         # Load OPES specific output files into dataframes
         print("\nReading plumed files:") if self.verbose else 0
-        self.colvar = fio.read_colvar(self.root, self.walker_paths, colvar, labels=walker_labels, verbose=self.verbose)
-        self.states, self.states_info = fio.read_states(f"{self.root}/{self.walker_paths[0]}/{states}", verbose=self.verbose)
-        self.kernels = fio.read_kernels(f"{self.root}/{self.walker_paths[0]}/{kernels}", verbose=self.verbose)
-
-        # Read Free Energy information
-        if fes:
-            print(f"\nReading free energy:") if self.verbose else 0
-            self.fes = fio.read_fes(fes, verbose=self.verbose)
-        else:
-            print(f"\nNo free energy will be read.") if self.verbose else 0
+        self.colvar = file_io.read_colvar(self.root, self.walker_paths, colvar, labels=walker_labels, verbose=self.verbose)
+        self.state_data, self.state_info = file_io.read_state(f"{self.root}/{self.walker_paths[0][:-1]}/{state}", verbose=self.verbose)
+        self.kernels = file_io.read_kernels(f"{self.root}/{self.walker_paths[0][:-1]}/{kernels}", verbose=self.verbose)
 
         # If multiple walkers, make a list containing the walkers as a new MD object
         if self.n_walkers > 1:
@@ -151,9 +148,8 @@ class OPES(MD):
             for i, path in enumerate(self.walker_paths):
                 print(f"\t-> Walker {i}...", end="") if self.verbose else 0
                 self.walkers.append(Walker(root=f"{self.root}/{path}",
-                                           topology=f"../run_prot.tpr",
+                                           topology=f"../run_prot.pdb",
                                            trajectory=f"run.xtc",
-                                           align_on=self.align_on,
                                            labels=walker_labels,
                                            id=i,
                                            colvar=f"COLVAR.{i}",
@@ -163,6 +159,7 @@ class OPES(MD):
     def calc(self,
              key,
              *args,
+             alias=None,
              save=True,
              **kwargs):
         ''' Calculate anything for OPES class '''
@@ -171,14 +168,25 @@ class OPES(MD):
         dispatcher = {'rmsd': calc.rmsd,
                       'rg': calc.rg,
                       'rmsf': calc.rmsf,
-                      'weights' : calc.weights}
-                    #   'mindist': calc.mindist}
+                      'weights' : calc.weights,
+                      'fes_state' : calc_fes.from_state,
+                      'fes_colvar' : calc_fes.from_colvar,
+        }
+                    #   'fes_kernels' : calc_fes.from_kernels,
+                    #   'kldiv' : calc_div.kldiv,
+                    #   'jsdiv' : calc_div.jsdiv,
+                    #   'dalonso' : calc_div.dalonso,
+                    #   'mindist': calc.mindist,
         
         # Run the requested function, with the given arguments
         value = dispatcher[key](*args, **kwargs)
         
         # Set as variable within the function and (if needed) save in the backpack
-        setattr(self, key, value)
+        if alias == None: 
+            setattr(self, key, value)
+        else:
+            setattr(self, alias, value)
+
         self.backpack.set(key, value) if save else 0
 
 
@@ -190,13 +198,12 @@ class Walker(MD):
                  root,
                  topology='run.pdb',
                  trajectory=None,
-                 align_on=None,
                  id=0,
                  labels=None,
                  colvar="COLVAR.0",
                  verbose=False):
         # Take over variables from the MD superclass.
-        super().__init__(root, topology, trajectory, align_on, verbose=verbose)
+        super().__init__(root, topology, trajectory, verbose=verbose)
 
         # Initialize own variables
         self.id = id
@@ -210,4 +217,4 @@ class Walker(MD):
         self.walker_names = ["."]
 
         # Load files
-        self.colvar = fio.read_colvar(root, self.walker_paths, colvar, labels=self.labels, verbose=self.verbose)
+        self.colvar = file_io.read_colvar(root, self.walker_paths, colvar, labels=self.labels, verbose=self.verbose)

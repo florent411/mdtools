@@ -25,7 +25,7 @@ def read_colvar(root, walker_paths, colvar, labels=None, verbose=False):
             first_line = file.readline()            
         column_names = first_line.strip().split(" ")[2:]
 
-        print(f"\t-> ./{root}/{colvar}...", end="") if verbose else 0
+        print(f"\t-> {root}/{colvar}...", end="") if verbose else 0
         df = pd.read_csv(f"{root}/{colvar}", names=column_names, delim_whitespace=True, comment="#")
         
         # Add label and frame number
@@ -42,12 +42,12 @@ def read_colvar(root, walker_paths, colvar, labels=None, verbose=False):
         for i, path in enumerate(walker_paths):
 
             # Get the names of the columns
-            with open(f"./{root}/{path}/{colvar}.{i}", "r") as file:
+            with open(f"{root}/{path}/{colvar}.{i}", "r") as file:
                 first_line = file.readline()            
             column_names = first_line.strip().split(" ")[2:]
 
             # Add walker number
-            walker_df = pd.read_csv(f"./{root}/{path}/{colvar}.{i}", names=column_names, delim_whitespace=True, comment="#")
+            walker_df = pd.read_csv(f"{root}/{path}/{colvar}.{i}", names=column_names, delim_whitespace=True, comment="#")
             walker_df['origin'] = labels[i]
     
             # Add frame number
@@ -68,12 +68,12 @@ def read_colvar(root, walker_paths, colvar, labels=None, verbose=False):
 
     return df
 
-def read_states(filename, verbose):
+def read_state(filename, verbose):
     ''' Read states file and modify data to fit into two dataframes. 
     1) states_data (dataframe containing the states data)
     2) states_info (containing the extra information, such as zed value/biasfactor etc.'''
 
-    print(f"\t-> ./{filename}...", end="") if verbose else 0
+    print(f"\t-> {filename}...", end="") if verbose else 0
     df = pd.read_csv(filename, delim_whitespace=True, low_memory=False)
 
     # Extracting all states from the dataframe and set the time as the index value
@@ -106,17 +106,8 @@ def read_kernels(filename, verbose):
         first_line = file.readline()            
     column_names = first_line.strip().split(" ")[2:]
 
-    print(f"\t-> ./{filename}...", end="") if verbose else 0
+    print(f"\t-> {filename}...", end="") if verbose else 0
     df = pd.read_csv(filename, names=column_names, delim_whitespace=True, comment="#")
     print(f"done") if verbose else 0
 
     return df
-
-def read_fes(filename, verbose):
-    ''' Read free energy data '''
-
-    print(f"\t-> ./{filename}...", end="") if verbose else 0
-    df = pd.read_csv(filename, sep="\s+")
-    print(f"done") if verbose else 0
-
-    return df    
