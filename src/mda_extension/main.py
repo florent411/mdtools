@@ -72,7 +72,6 @@ class MD(mda.Universe):
         for key in self.backpack.db.keys():
             setattr(self, key, self.backpack.get(key))
 
-
     def calc(self,
              key,
              *args,
@@ -165,12 +164,13 @@ class OPES(MD):
         ''' Calculate anything for OPES class '''
 
         # Available function in the calc module
-        dispatcher = {'rmsd': calc.rmsd,
-                      'rg': calc.rg,
-                      'rmsf': calc.rmsf,
-                      'weights' : calc.weights,
+        dispatcher = {'weights' : calc_fes.weights,
                       'fes_state' : calc_fes.from_state,
                       'fes_colvar' : calc_fes.from_colvar,
+                      'fes_weights' : calc_fes.from_weights,
+                      'rg': calc.rg,
+                      'rmsd': calc.rmsd,
+                      'rmsf': calc.rmsf,
         }
                     #   'fes_kernels' : calc_fes.from_kernels,
                     #   'kldiv' : calc_div.kldiv,
@@ -188,7 +188,6 @@ class OPES(MD):
             setattr(self, alias, value)
 
         self.backpack.set(key, value) if save else 0
-
 
 
 class Walker(MD):

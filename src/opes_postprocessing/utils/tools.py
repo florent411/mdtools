@@ -111,7 +111,7 @@ def setup_grid(grid_min, grid_max, bins, dimensions):
         if len(n_bins) == 1 and len(n_bins) != dimensions:
             n_bins *= dimensions            
         else:
-            sys.exit(f"ERROR: Given number of bins ({bins}) does not fit dimensionality ({dimensions}) of cvs ({cvs}).")
+            sys.exit(f"ERROR: Given number of bins ({bins}) does not fit dimensionality ({dimensions}) of cvs.")
 
     # Define a list with the bounds for each cv
     # [[cv1-min cv1-max] [cv2-min cv2-max] ... [cvn-min cvn-max]]]

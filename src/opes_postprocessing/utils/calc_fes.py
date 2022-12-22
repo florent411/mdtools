@@ -19,16 +19,47 @@ import opes_postprocessing.utils.tools as tools
 kb = 1.38064852e-23 # Boltzman's constant in m^2 kg s^-2 K^-1
 NA = 6.02214086e23 # Avogadro's constant in mol^-1
 
+def weights(colvar, temp=310):
+    """
+    Calculate the weights corresponding to each frame in the trajectory. 
+    These weights can be used for reweighting other cvs. 
+        
+    :param colvar: the dataframe created from the COLVAR file.
+    :param temp: temperature in K
+    
+    :return: df containing columns 'weights' and 'time'
+    """
 
-def from_state(state_data, # Input dataframe with data from which to calculate the FES
-               state_info, # Input dataframe with info (headers) from which to calculate the FES
-               cvs=None, # CV(s) to calculate the FES for, determines dimensionality.
-               process='last', # Process all frames (all), only last frame (last) or n frames (int).')
-               mintozero=True, # Shift the minimum to zero
-               temp=310, # in Kelvin
-               units='kT', # Output units Should be 'kT', 'kJ/mol' or 'kcal/mol'.
-               bins=100, # Number of bins for each cv.
-               device='mt', # How to run calculations (mt, np or torch). Mt is a looped code structure that can be multithreaded (fastest for smaller sets). Np performs all calculations using numpy arrays. Torch offloads to GPU (CUDA or MLS, the MacOS Intel GPU). If no GPU is available it runs on the CPUs.
+    kb = 1.38064852e-23 # Boltzman's constant in m^2 kg s^-2 K^-1 or J K^-1
+    NA = 6.02214086e23 # Avogadro's constant in mol^-1
+
+    # Get the bias values as a unitless factor.
+    # temp is the temperature
+    bias = colvar['opes.bias'].values / (kb * NA * temp / 1000)
+
+    # Calculate weights 
+    weights = np.exp(bias - np.amax(bias))
+
+    # Determine corresponding time, frame and walker in the trajectory
+    time = colvar['time'].values
+    origin = colvar['origin'].values
+
+    # Calculate the effective sample size (not yet used for anything)
+    effsize = np.sum(weights)**2 / np.sum(weights**2)
+
+    df = pd.DataFrame({'time' : time, 'weights' : weights, 'origin' : origin})
+        
+    return df
+
+def from_state(state_data,
+               state_info,
+               cvs=None,
+               process='last',
+               mintozero=True,
+               temp=310,
+               units='kT',
+               bins=100,
+               device='mt',
                verbose=True):
     
     """
@@ -253,16 +284,15 @@ def from_state(state_data, # Input dataframe with data from which to calculate t
 
     return fes_df
 
-
-def from_colvar(colvar, # Input dataframe with data from which to calculate the FES
-               cvs=None, # CV(s) to calculate the FES for, determines dimensionality.
-               sigmas=None, # Corresponding sigmas
-               process='last', # Process all frames (all), only last frame (last) or n frames (int).')
-               mintozero=True, # Shift the minimum to zero
-               temp=310, # in Kelvin
-               units='kT', # Output units Should be 'kT', 'kJ/mol' or 'kcal/mol'.
-               bins=100, # Number of bins per each cv: int, tuple, list or comma separated string.
-               device='mt', # How to run calculations (mt, np or torch). Mt is a looped code structure that can be multithreaded (fastest for smaller sets). Np performs all calculations using numpy arrays. Torch offloads to GPU (CUDA or MLS, the MacOS Intel GPU). If no GPU is available it runs on the CPUs.
+def from_colvar(colvar,
+               cvs=None,
+               sigmas=None,
+               process='last',
+               mintozero=True,
+               temp=310,
+               units='kT',
+               bins=100,
+               device='mt',
                verbose=True):
     """
     Calculate the free energy through reweighting of the COLVAR file. 
@@ -625,36 +655,137 @@ def from_colvar(colvar, # Input dataframe with data from which to calculate the 
 
 #     return fes_all
 
-def weights(colvar, temp):
+def from_weights(df,
+                 weights_df=None,
+                 colvar=None,
+                 bins=100,
+                 units='kT',
+                 temp=310,
+                 mintozero=True):
+                 
     """
-    Calculate the weights corresponding to each frame in the trajectory. 
-    These weights can be used for reweighting other cvs. 
-        
-    :param colvar: the dataframe created from the COLVAR file.
-    :param temp: temperature in K
+    Calculate a FES estimation for any cv/timeseries using the weights determine. 
     
-    :return: df containing columns 'weights' and 'time'
+    :param df: Dataframe containing the cv(s) timeseries. Needs columns 'time', '[cvs]', 'origin'.
+    :param weights: Dataframe containg the weights for each cv. Column headers must correspond. At least needed. 'time', 'weights', 'origin'. If not found, it will be calculated from provided colvar file.
+    :param colvar: the dataframe created from the COLVAR file. Used to call weights function.
+    :param units: Output units. 
+                  Options: -'kT'
+                           -'kJ/mol'
+                           -'kcal/mol'.
+    :param temp: temperature in K
+    :param mintozero: Shift the minimum to zero
+
+    
+    :return: df containing '[cv(s)]', 'dist_unweighted', 'dist_weighted', 'fes'
     """
 
-    kb = 1.38064852e-23 # Boltzman's constant in m^2 kg s^-2 K^-1 or J K^-1
-    NA = 6.02214086e23 # Avogadro's constant in mol^-1
+    # If weights are not given, try getting them from colvar file.
+    try:
+        # Make a copy to make sure you're not editing the original df.
+        weights_df = weights_df.copy()
 
-    # Get the bias values as a unitless factor.
-    # temp is the temperature
-    bias = colvar['opes.bias'].values / (kb * NA * temp / 1000)
+    except:
+        try:
+            print("No weights given. Trying to fetch from colvar.")
+            weights_df = weights(colvar)
+            print(weights_df)
 
-    # Calculate weights 
-    weights = np.exp(bias - np.amax(bias))
+        except Exception as e:
+            sys.exit(f"ERROR: {e}\n\nWeights ({weights}) and/or colvar ({colvar}) invaldig. Provide at least one of the two.")
+    
+    # Make a copy to make sure you're not editing the original df.
+    df = df.copy()
 
-    # Determine corresponding time, frame and walker in the trajectory
-    time = colvar['time'].values
-    origin = colvar['origin'].values
+    # Merge weights and dataframe
+    df = df.merge(weights_df, how="inner", on=["time", "origin"])
 
-    # Calculate the effective sample size (not yet used for anything)
-    effsize = np.sum(weights)**2 / np.sum(weights**2)
+    # First find the cvs in the input dataframe, this determines dimensionality
+    column_names = df.columns.to_list()
+    cvs = [cv for cv in column_names if cv not in ['time', 'fes', 'origin', 'weights']]
+    dimensions = len(cvs)
 
-    df = pd.DataFrame({'time' : time, 'weights' : weights, 'origin' : origin})
+    print(cvs)
+
+    # Calculate unitfactor (units conversion factor)
+    unitfactor = tools.get_unitfactor(units=units, temp=temp)
+
+    # Prepare the grid
+    # Define the bounds (min, max) and number of bins for each state
+    grid_min = df[cvs].min().values
+    grid_max = df[cvs].max().values
+
+    # Setup the grid
+    n_bins, mgrid = tools.setup_grid(grid_min, grid_max, bins, dimensions)
+
+    # 1D
+    if dimensions == 1:
+       
+        # Calculate unweighted histogram (dist_unweighted)
+        hist_u, bins_u = np.histogram(df[cvs[0]], bins=n_bins[0])
+        hist_u = hist_u / hist_u.sum() # Normalize (sum is 1)
+
+        # Calculate weighted histogram (dist_weighted)
+        hist_w, bins_w = np.histogram(df[cvs[0]], bins=n_bins[0], weights=df['weights'])
+        hist_w = hist_w / hist_w.sum() # Normalize (sum is 1)
+
+        # Get bin centers
+        bin_centers = (bins_w[:-1] + bins_w[1:]) / 2
+
+        # Calculate FES (and ignore divide by zero error.)
+        with np.errstate(divide='ignore'):
+            fes = -unitfactor * np.log(hist_w)
+
+        # If needed, set minimum to zero
+        if mintozero:
+            fes = fes - np.min(fes)
+  
+        fes_df = pd.DataFrame(
+                    {cvs[0] : bin_centers,
+                     'dist_unweighted' : hist_u,
+                     'dist_weighted' : hist_w,
+                     'fes' : fes})
+
+        return fes_df
+
+    elif len(cvs) == 2:
         
-    return df
+        # Setup bins
+        x_bins = np.linspace(grid_min[0], grid_max[0], n_bins[0])
+        y_bins = np.linspace(grid_min[1], grid_max[1], n_bins[1])
+        
+        # Calculate unweighted histogram (dist_unweighted)
+        hist_u, x_bins, y_bins = np.histogram2d(df[cvs[0]], df[cvs[1]], bins=(x_bins, y_bins))
+        # Histogram does not follow Cartesian convention,
+        # therefore transpose H for visualization purposes.
+        hist_u = hist_u.T
+        hist_u = hist_u / hist_u.sum() # Normalize (sum is 1)
 
-# def from_weights(df, weights=None):
+        # Calculate weighted histogram (dist_weighted)
+        hist_w, x_bins, y_bins = np.histogram2d(df[cvs[0]], df[cvs[1]], bins=(x_bins, y_bins), weights=df['weights'])
+        # Histogram does not follow Cartesian convention,
+        # therefore transpose H for visualization purposes.
+        hist_w = hist_w.T
+        hist_w = hist_w / hist_w.sum() # Normalize (sum is 1)
+
+        
+        # Get the center values of the bins
+        X, Y = np.meshgrid(x_bins, y_bins)
+        X_c = (x_bins[:-1] + x_bins[1:]) / 2
+        Y_c = (y_bins[:-1] + y_bins[1:]) / 2
+
+        # Calculate FES (and ignore divide by zero error.)
+        with np.errstate(divide='ignore'):
+            fes = -unitfactor * np.log(hist_w)
+
+        # If needed, set minimum to zero
+        if mintozero:
+            fes = fes - np.min(fes)
+
+        print(hist_w, hist_w.shape)
+        print(X_c, X_c.shape)
+        print(Y_c, Y_c.shape)
+
+    # Other dimensions are not yet implemented
+    else:
+        raise Exception("More than 2 dimensions not (yet) supported for this plot type.")

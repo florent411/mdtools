@@ -14,15 +14,15 @@ from sklearn.neighbors import KernelDensity
 # Included submodules
 from plotter.utils import tools
 
-def timeseries(df, # Input dataframe
-               variables, # Variable(s) to plot, has to correspond to the columns header in the df.
-               hue='origin', # What column to color the different lines on
-               density=True, # Plot marginal density distribution of the y axis
-               stride=10, # Stride the number of datapoints
-               rolling_avg=None, # Plot rolling average over a faded full  plot
-               label_dict=None, # Linking codes/column names with a more elaborate title to plot on the axes
-               palette="flare_r", # Colormap
-               save=True, # Save image in the ./img folder.
+def timeseries(df,
+               variables,
+               hue='origin',
+               density=True,
+               stride=10,
+               rolling_avg=None,
+               label_dict=None,
+               palette="flare_r",
+               save=True,
                **kwargs):
     """
     timeseries plots cv(s) vs time.
@@ -338,16 +338,16 @@ def rmsf(df, # Input dataframe
     return fig, axes
 
 # MetaD/OPES specific 
-def fes(df, # Input dataframe, needs to contain 'time', 'fes', 'cv' columns.
-        variables=None, # Variable(s) to plot, has to correspond to the columns header in the df.
-        fe_max=None, # Cap the Free Energy to a certain value.
-        last_x_procent=20, # Plot the evolution of FES over last x procent.
-        cbar='continuous', # Plot the cbar with discrete number or with a colobar (continuous). Options: 'off', 'discrete', 'continuous'.
-        palette='Spectral_r', # Colormap
-        kind='contourf', # Type of 2D plot. Options: "hist", "contour", "contourf" or "dc"
-        n_levels=None, # Number of levels for the colormap
-        label_dict=None, # Linking codes/column names with a more elaborate title to plot on the axes
-        save=True,  # Save image in the ./img folder.
+def fes(df,
+        variables=None,
+        fe_max=None,
+        last_x_procent=20,
+        cbar='continuous',
+        palette='Spectral_r',
+        kind='contourf',
+        n_levels=None,
+        label_dict=None,
+        save=True,
         **kwargs):
     """
     fes plots fes vs cv (over time).
@@ -519,17 +519,17 @@ def fes(df, # Input dataframe, needs to contain 'time', 'fes', 'cv' columns.
 
     return None
 
-def fes_rew(df, # Input dataframe
-            weights, # dataframe containing the weights for each cv
-            variables=None, # Variable(s) to plot, has to correspond to the columns header in the df.
-            kind='hist', # Type of plot. Options: 'fes', 'hist', or 'kde'
-            mintozero=True, # Put minimum value to zero for relative plots.
-            n_bins=100, # Number of bins for the histogram
-            fe_max=None, # Cap the Free Energy to a certain value.
-            n_levels=None, # Number of levels for the colormap
-            palette='Spectral_r', # Colormap
-            label_dict=None, # Linking codes/column names with a more elaborate title to plot on the axes
-            save=True,  # Save image in the ./img folder.
+def fes_rew(df,
+            weights,
+            variables=None,
+            kind='hist',
+            mintozero=True,
+            n_bins=100,
+            fe_max=None,
+            n_levels=None,
+            palette='Spectral_r',
+            label_dict=None,
+            save=True,
             **kwargs):
     """
     fes plots a reweighted FES using a time series (ts) and weights for reweighting. 1D and 2D. '''
