@@ -136,8 +136,8 @@ class OPES(MD):
         # Load OPES specific output files into dataframes
         print("\nReading plumed files:") if self.verbose else 0
         self.colvar = file_io.read_colvar(self.root, self.walker_paths, colvar, labels=walker_labels, verbose=self.verbose)
-        self.state_data, self.state_info = file_io.read_state(f"{self.root}/{self.walker_paths[0][:-1]}/{state}", verbose=self.verbose)
-        self.kernels = file_io.read_kernels(f"{self.root}/{self.walker_paths[0][:-1]}/{kernels}", verbose=self.verbose)
+        self.state_data, self.state_info = file_io.read_state(f"{self.root}/{self.walker_paths[0]}/{state}", verbose=self.verbose)
+        self.kernels = file_io.read_kernels(f"{self.root}/{self.walker_paths[0]}/{kernels}", verbose=self.verbose)
 
         # If multiple walkers, make a list containing the walkers as a new MD object
         if self.n_walkers > 1:

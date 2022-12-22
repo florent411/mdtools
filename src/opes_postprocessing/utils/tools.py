@@ -1,6 +1,6 @@
 #!/usr/bin/env python 
 
-''' General tools '''
+''' General tools for opes_postprocessing '''
 
 import os
 import sys
