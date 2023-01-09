@@ -75,7 +75,7 @@ class Backpack:
             size = os.get_terminal_size() 
             print("-" * size.columns)
         except Exception:
-            print("-" * 140)
+            print("-" * 130)
     
         for key, value in self.db.items():
             
@@ -85,7 +85,7 @@ class Backpack:
             if isinstance(item, pd.DataFrame):
                 # If dataframe show column names and shape.
                 content = f"Columns: {item.columns.values}"
-                shape = f"Shape: {item.shape}"
+                shape = f"{item.shape}"
                 t = "pd.Dataframe"
             elif isinstance(item, (np.ndarray, np.generic) ):
                 # If numpy array show first and last two values and shape.
@@ -95,8 +95,9 @@ class Backpack:
             else:
                 # Otherwise just output the value
                 content = value
+
                 shape = "-"
                 t = type(value)
 
-            print(f"-> {key:<20}{str(t):<30}{content:<60}{shape}")
+            print(f"-> {key:<20}{str(t):<30}{str(content):<60}{shape}")
         return True

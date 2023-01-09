@@ -66,7 +66,7 @@ def rg(universes, labels=None):
     for index, universe in tqdm(enumerate(universes), total=len(universes), desc='Universes', position=0):
         protein = universe.select_atoms("protein")
 
-        Rgyr = np.array([(universe.trajectory.time, protein.radius_of_gyration()) for ts in tqdm(universe.trajectory, total=len(universe.trajectory), desc="Rg", position=1)])
+        Rgyr = np.array([(universe.trajectory.time, protein.radius_of_gyration()) for ts in universe.trajectory])
 
         rg = pd.DataFrame(np.array(Rgyr), columns = ['time', 'rg'])
         
@@ -120,31 +120,3 @@ def rmsf(universes, labels=None, selection='protein and name CA'):
 
     return df
 
-def weights(colvar, T):
-    ''' Calculate the weights corresponding to each frame in the trajectory. 
-        These weights can be used for reweighting other cvs. 
-        
-        Inputs:
-        --> colvar: the dataframe created from the COLVAR file.
-        --> T: temperature in K'''
-
-    kb = 1.38064852e-23 # Boltzman's constant in m^2 kg s^-2 K^-1 or J K^-1
-    NA = 6.02214086e23 # Avogadro's constant in mol^-1
-
-    # Get the bias values as a unitless factor.
-    # T is the temperature
-    bias = colvar['opes.bias'].values / (kb * NA * T / 1000)
-
-    # Calculate weights 
-    weights = np.exp(bias - np.amax(bias))
-
-    # Determine corresponding time, frame and walker in the trajectory
-    time = colvar['time'].values
-    origin = colvar['origin'].values
-
-    # Calculate the effective sample size (not yet used for anything)
-    effsize = np.sum(weights)**2 / np.sum(weights**2)
-
-    df = pd.DataFrame({'time' : time, 'weights' : weights, 'origin' : origin})
-        
-    return df

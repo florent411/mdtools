@@ -29,12 +29,16 @@ def setup_format():
     rc('ytick', **ticks_style)
     rc('legend', **legend_style)
 
-def setup_palette(palette):
+def setup_palette(palette, n_hues=10, as_cmap=False):
     ''' Return palette '''
 
     # Setup colorpalette if a list of colors is inputted
     if type(palette) is list:
-        palette = sns.blend_palette(palette, as_cmap=True)
+        if as_cmap:
+            palette = sns.blend_palette(palette, as_cmap=True)
+        else:
+            palette = sns.blend_palette(palette, n_hues, as_cmap=False)
+
         return palette
     else:
         # Test if palette exists
@@ -82,7 +86,7 @@ def save_img(filename):
     ''' Save image if needed ''' 
 
     # Create img folder if it does not already exists.
-    os.makedirs("./out", exist_ok=True) 
+    os.makedirs("./img", exist_ok=True) 
     
     plt.savefig(f"./img/{filename}", bbox_inches="tight")
 

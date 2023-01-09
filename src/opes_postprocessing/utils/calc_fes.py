@@ -326,8 +326,6 @@ def from_colvar(colvar,
     cvs = tools.define_cvs(cvs, colvar, type='colvar')
     sigmas_dict = tools.define_sigmas(sigmas, cvs)
 
-    print("cvs: ", cvs)
-
     # Get dimensionality
     dimensions = len(cvs)
     print(f"Calculating FES of {' and '.join(cvs)} ({dimensions} dimension(s))") if verbose else 0
@@ -658,14 +656,15 @@ def from_colvar(colvar,
 def from_weights(df,
                  weights_df=None,
                  colvar=None,
-                 bins=100,
+                 bins=101,
                  units='kT',
                  temp=310,
-                 mintozero=True):
+                 mintozero=True,
+                 time=0):
                  
     """
     Calculate a FES estimation for any cv/timeseries using the weights determine. 
-    
+    colvar
     :param df: Dataframe containing the cv(s) timeseries. Needs columns 'time', '[cvs]', 'origin'.
     :param weights: Dataframe containg the weights for each cv. Column headers must correspond. At least needed. 'time', 'weights', 'origin'. If not found, it will be calculated from provided colvar file.
     :param colvar: the dataframe created from the COLVAR file. Used to call weights function.
@@ -675,6 +674,7 @@ def from_weights(df,
                            -'kcal/mol'.
     :param temp: temperature in K
     :param mintozero: Shift the minimum to zero
+    :param time: Give the time corresponding to this fes.
 
     
     :return: df containing '[cv(s)]', 'dist_unweighted', 'dist_weighted', 'fes'
@@ -689,10 +689,10 @@ def from_weights(df,
         try:
             print("No weights given. Trying to fetch from colvar.")
             weights_df = weights(colvar)
-            print(weights_df)
+            # print(weights_df)
 
         except Exception as e:
-            sys.exit(f"ERROR: {e}\n\nWeights ({weights}) and/or colvar ({colvar}) invaldig. Provide at least one of the two.")
+            sys.exit(f"ERROR: {e}\n\nWeights ({weights_df}) and/or colvar ({colvar}) invalid. Provide at least one of the two.")
     
     # Make a copy to make sure you're not editing the original df.
     df = df.copy()
@@ -704,8 +704,6 @@ def from_weights(df,
     column_names = df.columns.to_list()
     cvs = [cv for cv in column_names if cv not in ['time', 'fes', 'origin', 'weights']]
     dimensions = len(cvs)
-
-    print(cvs)
 
     # Calculate unitfactor (units conversion factor)
     unitfactor = tools.get_unitfactor(units=units, temp=temp)
@@ -745,6 +743,8 @@ def from_weights(df,
                      'dist_unweighted' : hist_u,
                      'dist_weighted' : hist_w,
                      'fes' : fes})
+        
+        fes_df['time'] = time
 
         return fes_df
 
@@ -763,12 +763,12 @@ def from_weights(df,
 
         # Calculate weighted histogram (dist_weighted)
         hist_w, x_bins, y_bins = np.histogram2d(df[cvs[0]], df[cvs[1]], bins=(x_bins, y_bins), weights=df['weights'])
+        
         # Histogram does not follow Cartesian convention,
         # therefore transpose H for visualization purposes.
         hist_w = hist_w.T
         hist_w = hist_w / hist_w.sum() # Normalize (sum is 1)
 
-        
         # Get the center values of the bins
         X, Y = np.meshgrid(x_bins, y_bins)
         X_c = (x_bins[:-1] + x_bins[1:]) / 2
@@ -782,9 +782,16 @@ def from_weights(df,
         if mintozero:
             fes = fes - np.min(fes)
 
-        print(hist_w, hist_w.shape)
-        print(X_c, X_c.shape)
-        print(Y_c, Y_c.shape)
+        # Turn into dataframe
+        fes_df = pd.DataFrame(fes.T, columns=Y_c, index=X_c)
+        
+        # Move index to column and melt df
+        fes_df = fes_df.reset_index(names=cvs[0])
+        fes_df = fes_df.melt(id_vars=cvs[0], var_name=cvs[1], value_name='fes')
+
+        fes_df['time'] = time
+
+        return fes_df
 
     # Other dimensions are not yet implemented
     else:

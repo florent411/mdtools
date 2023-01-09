@@ -47,16 +47,15 @@ def timeseries(df,
     tools.setup_format()
 
     # Setup color palette
-    palette = tools.setup_palette(palette)
+    # Check how many different lines/inputs there are.
+    n_hues = len(df[hue].unique())
+    palette = tools.setup_palette(palette, n_hues)
 
     # Setup variable list
     variables = tools.setup_variables(df, variables)
 
     # Stride, otherwise plotting gets very slow. (And reset index, otherwise Searborn complains)
-    df = df[df['time'] % stride == 0].reset_index()
-
-    # Check how many different lines/inputs there are.
-    n_hues = len(df[hue].unique())
+    df = df[df.index % stride == 0].reset_index()
 
     # Extra settings per option
     alpha = 0.3 if rolling_avg else 0.8
@@ -148,9 +147,14 @@ def timeseries(df,
     # Make 2D scatterplot with the time in the colorbar. 
     elif len(variables) == 2:
 
+        if density:
+            main_ax = axes[1][0]
+        else:
+            main_ax = axes[0][0]
+
         # Plot the timeseries
         # sns.kdeplot(ax = axes[1][0], data=df, x=variables[0], y=variables[1], hue=hue, palette=palette, alpha=0.1)
-        sns.lineplot(ax=axes[1][0],
+        sns.lineplot(ax=main_ax,
                      data=df,
                      x=variables[0],
                      y=variables[1],
@@ -162,9 +166,9 @@ def timeseries(df,
 
         # Add the proper labels for each axes
         if label_dict:
-            axes[1][0].set(xlabel=label_dict[variables[0]], ylabel=label_dict[variables[1]])
+            main_ax.set(xlabel=label_dict[variables[0]], ylabel=label_dict[variables[1]])
         else:
-            axes[1][0].set(xlabel=variables[0], ylabel=variables[1])
+            main_ax.set(xlabel=variables[0], ylabel=variables[1])
 
         # Add the rolling average for each walker
         if rolling_avg:
@@ -174,7 +178,7 @@ def timeseries(df,
             df[f'rolling_avg_y'] = df.groupby(hue)[variables[1]].rolling(rolling_avg).mean().shift(-round(rolling_avg/2)).droplevel(0)
 
             # Plot the rolling average
-            sns.lineplot(ax=axes[1][0],
+            sns.lineplot(ax=main_ax,
                          data=df,
                          x='rolling_avg_x',
                          y='rolling_avg_y',
@@ -238,19 +242,6 @@ def timeseries(df,
             axes[0][1].get_xaxis().set_visible(False)
             axes[0][1].get_yaxis().set_visible(False)
 
-        else:
-            # Plot the timeseries for each walker and color by time
-            # axes[1][0] is the left plot for each row. (The big one)
-            sns.lineplot(ax=axes[0][0],
-                         data=df,
-                         x=variables[0],
-                         y=variables[1],
-                         hue=hue,
-                         sort=False,
-                         palette=palette,
-                         linewidth=0.1,
-                         alpha=0.8)
-
         # Some more layout options
         # Add the proper labels for each axes
         if label_dict:
@@ -300,21 +291,27 @@ def rmsf(df, # Input dataframe
     # Setup default matplotlib values for layout
     tools.setup_format()
 
+    # Setup color palette
     # Check how many different lines/inputs there are.
     n_hues = len(df[hue].unique())
-
-    # Setup colorpalette if a list of colors is inputted
-    if type(palette) is list:
-        palette = sns.blend_palette(palette, n_hues)
+    palette = tools.setup_palette(palette, n_hues)
 
     # Plot figure
-    fig, axes = plt.subplots(figsize=(6,4))
-    sns.lineplot(ax=axes, data=df, x='resid', y='rmsf',
-                hue=hue, legend=True,
-                palette=palette, linewidth=2, marker='.')
+    fig, axes = plt.subplots(figsize=(8,4))
+    sns.lineplot(ax=axes,
+                 data=df,
+                 x='resid',
+                 y='rmsf',
+                 hue=hue,
+                 legend=True,
+                 palette=palette,
+                 linewidth=2,
+                 marker='.')
 
-    sns.move_legend(axes, "upper left", bbox_to_anchor=(1, 1))
-
+    if len(df['origin'].unique()) >1:
+        sns.move_legend(axes, "upper left", bbox_to_anchor=(1, 1))
+    else:
+        axes.legend([],[], frameon=False)
 
     plt.xticks(np.arange(min(df["resid"]), max(df["resid"]) + 1, 1.0))
 
@@ -328,9 +325,9 @@ def rmsf(df, # Input dataframe
             axes.set(xlabel=label_dict["resid"], ylabel=label_dict["rmsf"])
         except:
             print("Warning: couldn't find the labels in the label dict.")
-            axes.set(xlabel="ResID", ylabel="RMSF (nm)")
+            axes.set(xlabel="Residue ID", ylabel="RMSF (nm)")
     else:
-        axes.set(xlabel="ResID", ylabel="RMSF (nm)")
+        axes.set(xlabel="Residue ID", ylabel="RMSF (nm)")
 
     # Save image if needed.
     tools.save_img("rmsf.pdf") if save else 0
@@ -355,9 +352,10 @@ def fes(df,
     :param df: Input dataframe. Needs at least the columns 'fes', '[cv]', 'time'
     :param variables: Variable(s) to plot, has to correspond to the columns header in the df.
     :param fe_max: Cap the Free Energy to a certain value.
-    :param last_x_procent:, Plot the evolution of FES over last x procent.
-    :param n_levels:, Number of levels for the colormap
-    :param palette:  Colormap
+    :param last_x_procent: Plot the evolution of FES over last x procent.
+    :param cbar: How to show colorbar: 'continuous', 'discrete' or 'off'
+    :param n_levels: Number of levels for the colormap
+    :param palette: Colormap
     :param kind: Type of 2D plot. Options: "hist", "contour", "contourf" or "dc"
     :param n_levels: Number of levels for the colormap
     :param label_dict: Linking codes/column names with a more elaborate title to plot on the axes
@@ -373,7 +371,8 @@ def fes(df,
     tools.setup_format()
 
     # Setup color palette
-    palette = tools.setup_palette(palette)
+    # Check how many different lines/inputs there are.
+    palette = tools.setup_palette(palette, None, as_cmap=True)
 
     # Setup variable list
     variables = tools.setup_variables(df, variables)
@@ -393,11 +392,14 @@ def fes(df,
         time_cutoff = (df['time'].max() - df['time'].min()) / 100 * (100 - last_x_procent)
         df = df[df['time'] > time_cutoff]
 
+        print(time_cutoff)
+        print(df)
+
         fig, axes = plt.subplots(1, 1, figsize=(8,4))
 
         g = sns.lineplot(ax=axes,
                          data=df,
-                         x='ab',
+                         x=variables[0],
                          y='fes',
                          hue='time',
                          linewidth=1.2,
@@ -442,7 +444,6 @@ def fes(df,
             axes.set_ylim(bottom=0)
 
     elif len(variables) == 2:
-        pass
         # Setup plot
         fig, axes = plt.subplots(figsize=(8,4))
         pal = plt.get_cmap(palette).copy()
