@@ -19,9 +19,11 @@ def timeseries(df,
                hue='origin',
                density=True,
                stride=10,
-               rolling_avg=None,
+               moving_avg=None,
                label_dict=None,
                palette="flare_r",
+               p_type='line',
+               s_size=5,
                save=True,
                **kwargs):
     """
@@ -32,9 +34,11 @@ def timeseries(df,
     :param hue: What column to color the different lines on
     :param density: Plot marginal density distribution of the y axis
     :param stride: Stride the number of datapoints
-    :param rolling_avg: Plot rolling average over a faded full  plot
+    :param moving_avg: Plot moving average over a faded version of the full dataset plot
     :param label_dict: Linking codes/column names with a more elaborate title to plot on the axes
     :param palette: Colormap
+    :param ptype: Type of plot. Now supported: 'line', 'scatter' and 'kde' (kde is only for 2d).
+    :param s_size: Size of scatter points.
     :param save: Save image in the ./img folder.
 
     :return: fig and axes
@@ -58,9 +62,11 @@ def timeseries(df,
     df = df[df.index % stride == 0].reset_index()
 
     # Extra settings per option
-    alpha = 0.3 if rolling_avg else 0.8
+    alpha = 0.5 if moving_avg else 0.8
+    alpha -= 0.2 if len(variables) == 2 else 0
+
     legend_loc = 1 if density else 0
-    h_ratio = [1, 7] if len(variables) > 1 else [1]
+    h_ratio = [1, 7] if len(variables) == 2 else [1]
     w_ratio = [7, 1]
 
     # Create one or two subplots
@@ -77,16 +83,30 @@ def timeseries(df,
     # Other dimensions are not yet implemented
     if len(variables) == 1:
 
-        # Plot the timeseries
-        sns.lineplot(ax = axes[0][0],
-                     data=df,
-                     x='time',
-                     y=variables[0],
-                     hue=hue,
-                     palette=palette,
-                     linewidth=0.2,
-                     alpha=alpha)
-                     
+        if p_type == 'line':  
+            # Plot the timeseries
+            sns.lineplot(ax = axes[0][0],
+                        data=df,
+                        x='time',
+                        y=variables[0],
+                        hue=hue,
+                        palette=palette,
+                        linewidth=0.2,
+                        alpha=alpha)
+        elif p_type == 'scatter':
+            # Plot the timeseries
+            sns.scatterplot(ax = axes[0][0],
+                            data=df,
+                            x='time',
+                            y=variables[0],
+                            hue=hue,
+                            palette=palette,
+                            s=s_size,
+                            alpha=alpha)
+        else:
+            sys.exit("ERROR: Unsupported p_type: {p_type}. Please choose 'scatter' or 'line'.")
+
+
         # Add the proper labels for each axes
         try:
             axes[0][0].set(xlabel="Time (ns)", ylabel=label_dict[variables[0]])
@@ -94,16 +114,21 @@ def timeseries(df,
             print("Warning: couldn't find the labels in the label dict.")
             axes[0][0].set(xlabel="Time (ns)", ylabel=variables[0])
 
-        # Add the rolling average for each walker
-        if rolling_avg:
+        # Add the moving average for each walker
+        if moving_avg:
             # Calculate moving average and corresponding time values
             # This way the average is centered in the middle of the values it averages over (.shift()).
-            df[f'rolling_avg'] = df.groupby(hue)[variables[0]].rolling(rolling_avg).mean().shift(-round(rolling_avg/2)).droplevel(0)
+            df[f'moving_avg'] = df.groupby(hue)[variables[0]].rolling(moving_avg).mean().shift(-round(moving_avg/2)).droplevel(0)
 
-            # Plot the rolling average
-            sns.lineplot(ax=axes[0][0], data=df, x='time', y='rolling_avg',
-                        hue=hue, legend=False,
-                        palette=palette, linewidth=2)
+            # Plot the moving avg
+            sns.lineplot(ax=axes[0][0],
+                            data=df,
+                            x='time',
+                            y='moving_avg',
+                            hue=hue,
+                            legend=False,
+                            palette=palette,
+                            linewidth=2)
 
         # Add the densityplots on the side.
         if density:
@@ -153,16 +178,41 @@ def timeseries(df,
             main_ax = axes[0][0]
 
         # Plot the timeseries
-        # sns.kdeplot(ax = axes[1][0], data=df, x=variables[0], y=variables[1], hue=hue, palette=palette, alpha=0.1)
-        sns.lineplot(ax=main_ax,
-                     data=df,
-                     x=variables[0],
-                     y=variables[1],
-                     hue=hue,
-                     sort=False,
-                     palette=palette,
-                     linewidth=0.1,
-                     alpha=alpha)
+        if p_type == 'line':  
+            # Plot the timeseries
+            sns.lineplot(ax=main_ax,
+                         data=df,
+                         x=variables[0],
+                         y=variables[1],
+                         hue=hue,
+                         sort=False,
+                         palette=palette,
+                         linewidth=0.1,
+                         alpha=alpha)
+        elif p_type == 'scatter':
+            # Plot the timeseries
+            sns.scatterplot(ax = main_ax,
+                            data=df,
+                            x=variables[0],
+                            y=variables[1],
+                            hue=hue,
+                            palette=palette,
+                            s=s_size,
+                            alpha=alpha)
+        elif p_type == 'kde':
+            sns.kdeplot(ax=main_ax,
+                        data=df,
+                        x=variables[0],
+                        y=variables[1],
+                        legend=False,
+                        shade=True,
+                        levels=20,
+                        cmap=palette)
+
+        else:
+            sys.exit("ERROR: Unsupported p_type: {p_type}. Please choose 'scatter', 'line' or 'kde'.")
+
+
 
         # Add the proper labels for each axes
         if label_dict:
@@ -170,18 +220,18 @@ def timeseries(df,
         else:
             main_ax.set(xlabel=variables[0], ylabel=variables[1])
 
-        # Add the rolling average for each walker
-        if rolling_avg:
+        # Add the moving average for each walker
+        if moving_avg:
             # Calculate moving average and corresponding time values
             # This way the average is centered in the middle of the values it averages over (.shift()).
-            df[f'rolling_avg_x'] = df.groupby(hue)[variables[0]].rolling(rolling_avg).mean().shift(-round(rolling_avg/2)).droplevel(0)
-            df[f'rolling_avg_y'] = df.groupby(hue)[variables[1]].rolling(rolling_avg).mean().shift(-round(rolling_avg/2)).droplevel(0)
+            df[f'moving_avg_x'] = df.groupby(hue)[variables[0]].moving(moving_avg).mean().shift(-round(moving_avg/2)).droplevel(0)
+            df[f'moving_avg_y'] = df.groupby(hue)[variables[1]].moving(moving_avg).mean().shift(-round(moving_avg/2)).droplevel(0)
 
-            # Plot the rolling average
+            # Plot the moving average
             sns.lineplot(ax=main_ax,
                          data=df,
-                         x='rolling_avg_x',
-                         y='rolling_avg_y',
+                         x='moving_avg_x',
+                         y='moving_avg_y',
                          hue=hue,
                          legend=False,
                          palette=palette,
@@ -189,8 +239,6 @@ def timeseries(df,
 
         # Add the densityplots on the side.
         if density:
-
-            # Plot distribution of X in the thin upper left plot.
             sns.kdeplot(ax=axes[0][0],
                         data=df,
                         x=variables[0],
@@ -226,14 +274,24 @@ def timeseries(df,
 
             # Plot 2D distribution in the small upper right plot.
             try:
-                sns.kdeplot(ax=axes[0][1],
-                            data=df,
-                            x=variables[0],
-                            y=variables[1],
-                            legend=False,
-                            shade=True,
-                            cmap=palette,
-                            alpha=.3)
+                if p_type == 'kde':
+                    sns.scatterplot(ax = axes[0][1],
+                                    data=df,
+                                    x=variables[0],
+                                    y=variables[1],
+                                    hue=hue,
+                                    palette=palette,
+                                    s=s_size/5,
+                                    alpha=alpha)                
+                else:
+                    sns.kdeplot(ax=axes[0][1],
+                                data=df,
+                                x=variables[0],
+                                y=variables[1],
+                                legend=False,
+                                shade=True,
+                                cmap=palette,
+                                alpha=.3)
 
             except Exception as e:
                 print(f"Warning: {e} --> not showing plot in upper right corner.")
@@ -294,7 +352,7 @@ def rmsf(df, # Input dataframe
     # Setup color palette
     # Check how many different lines/inputs there are.
     n_hues = len(df[hue].unique())
-    palette = tools.setup_palette(palette, n_hues)
+    palette = tools.setup_palette(palette, n_hues=n_hues)
 
     # Plot figure
     fig, axes = plt.subplots(figsize=(8,4))
@@ -370,10 +428,6 @@ def fes(df,
     # Setup default matplotlib values for layout
     tools.setup_format()
 
-    # Setup color palette
-    # Check how many different lines/inputs there are.
-    palette = tools.setup_palette(palette, None, as_cmap=True)
-
     # Setup variable list
     variables = tools.setup_variables(df, variables)
 
@@ -386,14 +440,17 @@ def fes(df,
 
         # If you want to cap the FE
         if fe_max:
-            df['fes'].where(df['fes'] < fe_max, fe_max, inplace=True)
+            df['fes'] = df['fes'].where(df['fes'] < fe_max, fe_max)
         
         # Only plot last x procent
-        time_cutoff = (df['time'].max() - df['time'].min()) / 100 * (100 - last_x_procent)
-        df = df[df['time'] > time_cutoff]
+        if len(df['time'].unique()) != 1:       
+            time_cutoff = (df['time'].max() - df['time'].min()) / 100 * (100 - last_x_procent)
+            df = df[df['time'] > time_cutoff]
 
-        print(time_cutoff)
-        print(df)
+        # Setup color palette
+        # Check how many different lines/inputs there are.
+        n_hues = len(df['time'].unique())
+        palette = tools.setup_palette(palette, n_hues)
 
         fig, axes = plt.subplots(1, 1, figsize=(8,4))
 
@@ -405,7 +462,10 @@ def fes(df,
                          linewidth=1.2,
                          palette=palette)
 
-        if cbar == 'continuous':
+        if cbar == 'off' or len(df['time'].unique()) == 1:       
+            # Remove legend
+            g.get_legend().remove()
+        elif cbar == 'continuous':
             # Create colorbar
             norm = plt.Normalize(df['time'].min(), df['time'].max())
             sm = plt.cm.ScalarMappable(cmap=palette, norm=norm)
@@ -418,9 +478,6 @@ def fes(df,
         elif cbar == 'discrete':
             # Put legend outside of plot
             g.legend(loc='upper left', bbox_to_anchor=(1, 1))
-        elif cbar == 'off':
-            # Remove legend
-            g.get_legend().remove()
         else:
             sys.exit("ERROR: cbar must be one of 'continuous', 'discrete' or 'off'")
 
@@ -449,9 +506,13 @@ def fes(df,
         pal = plt.get_cmap(palette).copy()
         pal.set_bad('white', 1.0)
 
-        # Turn df into 2d grid.
+        # Turn df into 2d grid and only take last timeframe.
         fes = df[df['time'] == df['time'].unique()[-1]].pivot(index=variables[1], columns=variables[0], values='fes')
-        
+
+        # Setup color palette
+        # Check how many different lines/inputs there are.
+        palette = tools.setup_palette(palette, 100)
+
         # If you want to cap the FE
         if fe_max:
             fes[fes > fe_max] = np.nan
@@ -514,21 +575,19 @@ def fes(df,
     else:
         raise Exception("More than 2 dimensions not (yet) supported for this plot type.")
 
-
     # Save image if needed.
-    tools.save_img(f"fes_rew_{'_'.join(variables)}.pdf") if save else 0
+    tools.save_img(f"fes_{'_'.join(variables)}.pdf") if save else 0
 
-    return None
+    return fig, axes
 
 def fes_rew(df,
-            weights,
             variables=None,
-            kind='hist',
-            mintozero=True,
-            n_bins=100,
             fe_max=None,
             n_levels=None,
+            dist=True,
             palette='Spectral_r',
+            dist_palette=['#808080', '#A43820'],
+            kind='contourf',
             label_dict=None,
             save=True,
             **kwargs):
@@ -556,76 +615,61 @@ def fes_rew(df,
     # Setup default matplotlib values for layout
     tools.setup_format()
 
-    # Setup color palette
-    palette = tools.setup_palette(palette)
+    # Setup color palettes
+    palette = tools.setup_palette(palette, n_hues=1)
+    dist_palette = tools.setup_palette(dist_palette, n_hues=2)
 
     # Setup variable list
     variables = tools.setup_variables(df, variables)
 
-    # Merge weights and dataframe
-    df = df.merge(weights, how="inner", on=["time", "origin"])
+    # If you want to cap the FE
+    if fe_max:
+        df['fes'] = df['fes'].where(df['fes'] < fe_max, fe_max)
 
     if len(variables) == 1:
         # Setup plot
         fig, axes = plt.subplots(figsize=(8,4))
         axes_dist = axes.twinx()
+
         
-        # Calc and plot probability distribution
-        # Print only FES
-        if kind == "fes":
-            hist, bins = np.histogram(df[variables[0]], bins=n_bins, weights=df['weights']) # Make histogram
-            hist = hist / hist.sum() # Normalize (sum is 1)
-            bin_width = bins[1] - bins[0] # Get bar width
-            bin_centers = (bins[:-1] + bins[1:]) / 2 # Get bin centers
-
-        # Print FES with histograms
-        elif kind == "hist":
-            for index, w in enumerate(['simulation', 'reweighted']):
-                # Calculate histogram
-                if w == 'simulation':
-                    hist, bins = np.histogram(df[variables[0]], bins=n_bins) # Make histogram
-                else:
-                    hist, bins = np.histogram(df[variables[0]], bins=n_bins, weights=df['weights']) # Make histogram
-                hist = hist / hist.sum() # Normalize (sum is 1)
-                bin_width = bins[1] - bins[0] # Get bar width
-                bin_centers = (bins[:-1] + bins[1:]) / 2 # Get bin centers
-
-                # Plot
-                axes_dist.bar(bin_centers, hist, width=bin_width, color=["#808080", "#A43820"][index], alpha=0.1, label=w)
-                axes_dist.yaxis.set_ticklabels([])
-
-        # Print FES with KDEs
-        elif kind =='kde':
-            bin_centers = np.linspace(df[variables[0]].min(), df[variables[0]].max(), 100)
+        # Plot (re)weighted probality distributions
+        if dist:
+            bin_centers = df[variables[0]].values
             bin_width = bin_centers[1] - bin_centers[0]
-            
-            for index, w in enumerate(['simulation', 'reweighted']):
-                kde = KernelDensity(bandwidth=bin_width, kernel='gaussian')
-                if w == 'simulation':
-                    kde.fit(df[variables[0]].values.reshape([-1,1]))
-                else:
-                    kde.fit(df[variables[0]].values.reshape([-1,1]), sample_weight=df['weights'].values)
-                hist = np.exp(kde.score_samples(bin_centers.reshape(-1,1)))
-            
-                # Plot kernel density
-                axes_dist.fill_between(bin_centers, hist, color=["#808080", "#A43820"][index], linewidth=0, alpha=0.1, label=w)
 
+            for index, w in enumerate(['dist_unweighted', 'dist_reweighted']):
+                # Plot
+                sns.lineplot(ax=axes_dist,
+                            data=df,
+                            x=variables[0],
+                            y=w,
+                            linewidth=0)
+
+                # Fill area under the curve
+                axes_dist.fill_between(bin_centers,
+                                       df[w].values,
+                                       color=dist_palette[index],
+                                       linewidth=0,
+                                       alpha=0.3,
+                                       label=w.split("_")[-1])
         else:
-            raise ValueError(f"kind ({kind}) not supported (in this dimensionality). Use 'fes', 'hist' of 'kde'.")
-
-        # Calculate FES (and ignore divide by zero error.)
-        with np.errstate(divide='ignore'):
-            fes = -np.log(hist) # in kBT
-
-        # If needed, set minimum to zero
-        if mintozero:
-            fes = fes - np.min(fes)
+            pass
 
         # Plot FES
-        axes.plot(bin_centers, fes, color=["#808080", "#A43820"][1], linewidth=2)
+        sns.lineplot(ax=axes,
+                     data=df,
+                     x=variables[0],
+                     y='fes',
+                     hue='time',
+                     palette=palette,
+                     linewidth=2)
 
         # Some more layout options
-        
+
+        # Remove the distribution's Y-label and ticks
+        axes_dist.set_ylabel('')
+        axes_dist.set_yticks([])
+
         # Add the proper labels for each axes
         try:
             axes.set(xlabel=label_dict[variables[0]], ylabel=f"Free Energy ($k_BT$)")
@@ -646,11 +690,16 @@ def fes_rew(df,
         except:
             axes.set_ylim(bottom=0)
 
-
         # set y-range of distribution
         axes_dist.set_ylim(bottom=0)
         axes_dist.yaxis.set_ticklabels([])
-        axes_dist.legend(title='Sampling distribution') if kind != 'fes' else 0
+        axes_dist.legend(title='Sampling distribution') if dist else 0
+
+        # Set dist legend outside of plot
+        sns.move_legend(axes_dist, "upper left", bbox_to_anchor=(1, 1))
+
+        # Remove legend
+        axes.legend([],[], frameon=False)
 
     elif len(variables) == 2:
         # Setup plot
@@ -658,52 +707,42 @@ def fes_rew(df,
         pal = plt.get_cmap(palette).copy()
         pal.set_bad('white', 1.0)
 
-        x_bins = np.linspace(df[variables[0]].min(), df[variables[0]].max(), n_bins)
-        y_bins = np.linspace(df[variables[1]].min(), df[variables[1]].max(), n_bins)
-        
-        hist, x_bins, y_bins = np.histogram2d(df[variables[0]], df[variables[1]], bins=(x_bins, y_bins), weights=df['weights'])
-        
-        # Histogram does not follow Cartesian convention,
-        # therefore transpose H for visualization purposes.
-        hist = hist.T
-        hist = hist / hist.sum() # Normalize (sum is 1)
-        
-        X, Y = np.meshgrid(x_bins, y_bins)
-        
-        # Get the center values of the bins
-        X_c = (x_bins[:-1] + x_bins[1:]) / 2
-        Y_c = (y_bins[:-1] + y_bins[1:]) / 2
+        # Turn df into 2d grid and only take last timeframe.
+        fes = df[df['time'] == df['time'].unique()[-1]].pivot(index=variables[1], columns=variables[0], values='fes')
 
-        # Calculate FES (and ignore divide by zero error.)
-        with np.errstate(divide='ignore'):
-            fes = -np.log(hist) # in kBT
+        # Setup color palette
+        # Check how many different lines/inputs there are.
+        palette = tools.setup_palette(palette, 100)
 
-        # If needed, set minimum to zero
-        if mintozero:
-            fes = fes - np.min(fes)
-        
-        # If you want 
+        # If you want to cap the FE
         if fe_max:
             fes[fes > fe_max] = np.nan
+        else:
+            fe_max = round(fes.values.max())
 
         # Make levels each 1 kBT (or each 0.1 kBT if fe_max < 1)
         if not n_levels:
             n_levels = fe_max if fe_max > 1 else round(fe_max * 10)
 
         levels = np.linspace(0.0, fe_max, n_levels + 1)
-            
+
+        # Define data            
+        X = fes.columns.values
+        Y = fes.index.values
+        Z = fes.values
+
         # Plot   
         if kind == "hist":
-            img = axes.pcolormesh(X, Y, fes, cmap=palette, shading='auto')   
+            img = axes.pcolormesh(X, Y, Z, cmap=palette, shading='auto')   
         elif kind == "contour":         
-            img = axes.contour(X_c, Y_c, fes, cmap=palette, levels=levels, corner_mask=True, extend='max')
+            img = axes.contour(X, Y, Z, cmap=palette, levels=levels, corner_mask=True, extend='max')
         elif kind == "contourf":
-            img = axes.contourf(X_c, Y_c, fes, cmap=palette, levels=levels, corner_mask=True, extend='max')
+            img = axes.contourf(X, Y, Z, cmap=palette, levels=levels, corner_mask=True, extend='max')
         elif kind =="dc":
-            img = axes.contour(X_c, Y_c, fes, colors="#000000", levels=levels, corner_mask=True, extend='max', linewidths=0.4)
+            img = axes.contour(X, Y, Z, colors="#000000", levels=levels, corner_mask=True, extend='max', linewidths=0.4)
 
             c_levels = np.linspace(0.0, fe_max, 50*(n_levels + 1))
-            img = axes.contourf(X_c, Y_c, fes, cmap=palette, levels=c_levels, corner_mask=True, extend='max')
+            img = axes.contourf(X, Y, Z, cmap=palette, levels=c_levels, corner_mask=True, extend='max')
         else:
             raise ValueError(f"kind ({kind}) not supported (in this dimension). Use 'hist', 'contour', 'contourf.")
 
@@ -731,17 +770,17 @@ def fes_rew(df,
         try:
             axes.set_ylim(kwargs['yrange'])
         except:
-            axes.set_ylim(bottom=0)
+            pass
 
     # Other dimensions are not yet implemented
     else:
         raise Exception("More than 2 dimensions not (yet) supported for this plot type.")
 
-
     # Save image if needed.
     tools.save_img(f"fes_rew_{'_'.join(variables)}.pdf") if save else 0
 
     return fig, axes
+
 
 def kernels_time(kernels, save=True):
     ''' Plot kernels over time '''

@@ -4,8 +4,17 @@
 
 import pandas as pd
 
-def read_colvar(root, walker_paths, colvar, labels=None, verbose=False):
-    ''' Read COLVAR file(s) into dataframe. '''
+def read_colvar(root, walker_paths, colvar='COLVAR', labels=None, verbose=False):
+    """Read COLVAR file(s) into dataframe.
+
+    :param root: Main folder.
+    :param walker_paths: List of path to all walkers. (/. if only 1 walker.)
+    :param colvar: Name of the COLVAR file. (Default value = 'COLVAR')
+    :param labels: Corresponding labels. (Default value = None)
+    :param verbose: Print what's happening. (Default value = False)
+
+    :returns: dataframe of the COLVAR file
+    """
 
     n_walkers = len(walker_paths)
 
@@ -55,7 +64,7 @@ def read_colvar(root, walker_paths, colvar, labels=None, verbose=False):
 
             colvar_list.append(walker_df)
 
-        # Add all walkers to the main dataframe and sort by
+        # Add all walkers to the main dataframe and sort by walker and time
         # This corresponds with `sort -gs walker*/COLVAR.* > walker0/COLVAR` in bash.
         # df = pd.concat(colvar_list).sort_values(by=['time', 'walker'])
         
@@ -68,10 +77,16 @@ def read_colvar(root, walker_paths, colvar, labels=None, verbose=False):
 
     return df
 
-def read_state(filename, verbose):
-    ''' Read states file and modify data to fit into two dataframes. 
-    1) states_data (dataframe containing the states data)
-    2) states_info (containing the extra information, such as zed value/biasfactor etc.'''
+def read_state(filename, verbose=False):
+    """
+    Read states file and modify data to fit into two dataframes.
+
+    :param filename: path of STATE file. 
+    :param verbose: Print what's happening. (Default value = False)
+
+    :returns: states_data: dataframe containing the STATE data.
+    :returns: states_info: containing the extra information, such as zed value/biasfactor etc.
+    """
 
     print(f"\t-> {filename}...", end="") if verbose else 0
     df = pd.read_csv(filename, delim_whitespace=True, low_memory=False)
@@ -99,7 +114,14 @@ def read_state(filename, verbose):
     return states_data, states_info
 
 def read_kernels(filename, verbose):
-    ''' Read KERNELS file into dataframe. '''
+    """Read KERNELS file into dataframe.
+
+    :param filename: path of KERNELS file. 
+    :param verbose: Print what's happening. (Default value = False)
+
+    :returns: dataframe containing the KERNELS data.
+
+    """
 
     # Get the names of the columns
     with open(filename, "r") as file:

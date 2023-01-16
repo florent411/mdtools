@@ -105,7 +105,7 @@ class OPES(MD):
                  root=os.getcwd(),
                  topology='run.pdb',
                  trajectory=None,
-                 walker_labels=None,
+                 walker_prefix=None,
                  colvar='COLVAR',
                  state='STATE',
                  kernels='KERNELS',
@@ -119,22 +119,26 @@ class OPES(MD):
             if type(trajectory) is not list:
                 trajectory = [trajectory]
             
-            # Get the number of walkers based on the number of trajectories and save the paths in a list.
+            # Get the number of walkers based on the number of trajectories and save the paths, names, ids and origins in a list.
             self.n_walkers = len(trajectory)
             self.walker_paths = [f"{os.path.dirname(traj)}" for traj in trajectory]
             self.walker_names = [f"{os.path.basename(os.path.dirname(traj))}" for traj in trajectory]
+            self.walker_ids = [*range(self.n_walkers)]
+            self.walker_origins = [f"{walker_prefix}{id}" for id in self.walker_ids]
 
         else:
             self.n_walkers = 1
             self.walker_paths = ["."]
             self.walker_names = ["."]
+            self.walker_ids = ["."]
+            self.walker_origins = ["."]
 
         # Check if the lengths are right.
         Guard.is_length_equals(self.walker_paths, self.n_walkers)
             
         # Load OPES specific output files into dataframes
         print("\nReading plumed files:") if self.verbose else 0
-        self.colvar = file_io.read_colvar(self.root, self.walker_paths, colvar, labels=walker_labels, verbose=self.verbose)
+        self.colvar = file_io.read_colvar(self.root, self.walker_paths, colvar, labels=walker_prefix, verbose=self.verbose)
         self.state_data, self.state_info = file_io.read_state(f"{self.root}/{self.walker_paths[0]}/{state}", verbose=self.verbose)
         self.kernels = file_io.read_kernels(f"{self.root}/{self.walker_paths[0]}/{kernels}", verbose=self.verbose)
 
@@ -149,7 +153,7 @@ class OPES(MD):
                 self.walkers.append(Walker(root=f"{self.root}/{path}",
                                            topology=f"../run_prot.pdb",
                                            trajectory=f"run.xtc",
-                                           labels=walker_labels,
+                                           prefix=walker_prefix,
                                            id=i,
                                            colvar=f"COLVAR.{i}",
                                            verbose=False))
@@ -184,10 +188,11 @@ class OPES(MD):
         # Set as variable within the function and (if needed) save in the backpack
         if alias == None: 
             setattr(self, key, value)
+            self.backpack.set(key, value) if save else 0
         else:
             setattr(self, alias, value)
+            self.backpack.set(alias, value) if save else 0
 
-        self.backpack.set(key, value) if save else 0
 
 
 class Walker(MD):
@@ -198,7 +203,7 @@ class Walker(MD):
                  topology='run.pdb',
                  trajectory=None,
                  id=0,
-                 labels=None,
+                 prefix=None,
                  colvar="COLVAR.0",
                  verbose=False):
         # Take over variables from the MD superclass.
@@ -207,13 +212,14 @@ class Walker(MD):
         # Initialize own variables
         self.id = id
 
-        if labels is None:
-            self.labels = [self.id]
-        elif type(labels) is not list:
-            self.labels = [labels + str(self.id)]
+        if prefix is None:
+            self.origin = self.id
+        else:
+            self.origin = prefix + str(self.id)
 
         self.walker_paths = ["."]
         self.walker_names = ["."]
 
+
         # Load files
-        self.colvar = file_io.read_colvar(root, self.walker_paths, colvar, labels=self.labels, verbose=self.verbose)
+        self.colvar = file_io.read_colvar(root, self.walker_paths, colvar, labels=self.origin, verbose=self.verbose)

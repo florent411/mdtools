@@ -15,13 +15,17 @@ import time
 import mda_extension.utils.tools as tools
 import mda_extension.utils.mp_functions as mpf
 
-def rmsd(universes, labels=None, selection='protein and name CA'):
-    ''' Calculate root-mean square deviation (rmsd) 
+def rmsd(universes,
+         labels=None,
+         selection='protein and name CA'):
+    """Calculate root-mean square deviation (rmsd)
     
-        Inputs:
-        --> universes: list of universes.
-        (--> labels: list of corresponding labels. If only one value is given, use it as a prefix. If empty just use numbers 0...n as labels.)
-        (--> selection: proteinselection on which to align before running rmsd)'''
+    :param universes: list of the universes to analyse
+    :param labels: list of corresponding labels. If only one value is given, use it as a prefix. If empty just use numbers 0...n as labels. (Default value = None)
+    :param selection: proteinselection on which to align before running rmsd. (Default value = 'protein and name CA')
+
+    :returns: df containing columns 'time', 'rmsd' and 'origin'.
+    """
 
     # Preprocess universes and labels.
     # Turn into lists and make the labels fit the universes.
@@ -49,11 +53,13 @@ def rmsd(universes, labels=None, selection='protein and name CA'):
     return df
 
 def rg(universes, labels=None):
-    ''' Calculate radius of gyration (R_g)
+    """Calculate radius of gyration (R_g)
     
-        Inputs:
-        --> universes: list of universes.
-        (--> labels: list of corresponding labels. If only one value is given, use it as a prefix. If empty just use numbers 0...n as labels.)'''
+    :param universes: list of the universes to analyse
+    :param labels: list of corresponding labels. If only one value is given, use it as a prefix. If empty just use numbers 0...n as labels. (Default value = None)
+
+    :returns: df containing columns 'time', 'rg' and 'origin'.
+    """
 
     # Preprocess universes and labels.
     # Turn into lists and make the labels fit the universes.
@@ -82,12 +88,14 @@ def rg(universes, labels=None):
     return df
 
 def rmsf(universes, labels=None, selection='protein and name CA'):
-    ''' Calculate root-mean square fluctuation per residue (rmsf) 
+    """Calculate root-mean square fluctuation per residue (rmsf)
     
-        Inputs:
-        --> universes: list of universes.
-        (--> labels: list of corresponding labels.)
-        (--> selection: proteinselection on which to align before running rmsf)'''
+    :param universes: list of the universes to analyse
+    :param labels: list of corresponding labels. If only one value is given, use it as a prefix. If empty just use numbers 0...n as labels. (Default value = None)
+    :param selection: proteinselection on which to align before running rmsd. (Default value = 'protein and name CA')
+
+    :returns: df containing columns 'resid', 'rmsf' and 'origin'.
+    """
 
     # Preprocess universes and labels.
     # Turn into lists and make the labels fit the universes.

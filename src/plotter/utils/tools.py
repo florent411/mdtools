@@ -10,7 +10,16 @@ from matplotlib import rc
 import matplotlib.pyplot as plt
 
 def moving_average(a, n=3):
-    ''' Calculate moving average'''
+    """
+    Calculate moving average (https://en.wikipedia.org/wiki/Moving_average).
+        
+    :param palette: Can be the name of an existing palette (https://www.geeksforgeeks.org/seaborn-color-palette/)
+                    or a list of colors (python list of comma seperated string), from which a palette is generated.
+    :param n_hues: The number of colors the palette has to exist of.
+    
+    :return: palette
+    """
+    
     ret = np.cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
@@ -29,28 +38,58 @@ def setup_format():
     rc('ytick', **ticks_style)
     rc('legend', **legend_style)
 
-def setup_palette(palette, n_hues=10, as_cmap=False):
-    ''' Return palette '''
+def setup_palette(palette, n_hues=10):
+    """
+    Create a seaborn palette based on a palette name or a list of colors. 
+        
+    :param palette: Can be the name of an existing palette (https://www.geeksforgeeks.org/seaborn-color-palette/)
+                    or a list of colors (python list of comma seperated string), from which a palette is generated.
+    :param n_hues: The number of colors the palette has to exist of.
+    
+    :return: palette
+    """
 
     # Setup colorpalette if a list of colors is inputted
     if type(palette) is list:
-        if as_cmap:
-            palette = sns.blend_palette(palette, as_cmap=True)
-        else:
-            palette = sns.blend_palette(palette, n_hues, as_cmap=False)
+        # If only 1 color, double it to create a single color spectrum/palette in sns.blend_palette (which takes a minimum of 2 colors)
+        if len(palette) == 1:
+            palette += palette
+
+        # Create a palette based on the inputted colors
+        palette = sns.blend_palette(palette, n_hues)
 
         return palette
-    else:
+
+    elif type(palette) is str:
         # Test if palette exists
         try:
             sns.color_palette(palette, as_cmap=True)
             return palette
     
-        except Exception as e:
-            raise TypeError(f"ERROR: {palette} is not a valid palette.\n\n{e}")
+        except:
+            palette = list(map(str, palette.split(','))) # list of strings
+
+            # If only 1 color, double it to create a single color spectrum/palette in sns.blend_palette (which takes a minimum of 2 colors)
+            if len(palette) == 1:
+                palette += palette
+
+            # Create a palette based on the inputted colors
+            palette = sns.blend_palette(palette, n_hues)
+
+            return palette
+
+    else:
+            raise TypeError(f"ERROR: {palette} is not a valid palette input.")
 
 def setup_variables(df, variables=None):
-    ''' Define variables, either from user input, or, if variables are not defined, take them from the input dataframe '''
+    """
+    Define variables, either from user input, or, if variables are not defined, take them from the input dataframe '''
+        
+    :param df: df from which to extract what variables there are.
+    :param variables: User input. List of chosen variables. This function then checks if they actually exist in the df.
+    
+    :return: list of variables
+    """
 
     # First find the variables in the input dataframe
     column_names = df.columns.to_list()
@@ -83,7 +122,13 @@ def setup_variables(df, variables=None):
 
 
 def save_img(filename):
-    ''' Save image if needed ''' 
+    """
+    Save the plot as an image in the ./img/ directory.
+        
+    :param filename: Name of the file to save to.
+
+    :return: 0
+    """
 
     # Create img folder if it does not already exists.
     os.makedirs("./img", exist_ok=True) 

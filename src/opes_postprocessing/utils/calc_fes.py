@@ -27,7 +27,7 @@ def weights(colvar, temp=310):
     :param colvar: the dataframe created from the COLVAR file.
     :param temp: temperature in K
     
-    :return: df containing columns 'weights' and 'time'
+    :returns: df containing columns 'weights' and 'time'
     """
 
     kb = 1.38064852e-23 # Boltzman's constant in m^2 kg s^-2 K^-1 or J K^-1
@@ -84,7 +84,7 @@ def from_state(state_data,
                             -'torch' offloads to GPU (CUDA or MLS, the MacOS Intel GPU). If no GPU is available it runs on the CPUs.
     :param verbose: Print output when running.
   
-    :return: df containing columns '[cv]' and 'time'
+    :returns: df containing columns '[cv]' and 'time'
     """
 
     # Calculate unitfactor (units conversion factor)
@@ -316,7 +316,7 @@ def from_colvar(colvar,
                             -'torch' offloads to GPU (CUDA or MLS, the MacOS Intel GPU). If no GPU is available it runs on the CPUs.
     :param verbose: Print output when running.
   
-    :return: df containing columns '[cv]' and 'time'
+    :returns: df containing columns '[cv]' and 'time'
     """
 
     # Calculate unitfactor (units conversion factor)
@@ -677,7 +677,7 @@ def from_weights(df,
     :param time: Give the time corresponding to this fes.
 
     
-    :return: df containing '[cv(s)]', 'dist_unweighted', 'dist_weighted', 'fes'
+    :returns: df containing '[cv(s)]', 'dist_unweighted', 'dist_reweighted', 'fes'
     """
 
     # If weights are not given, try getting them from colvar file.
@@ -723,7 +723,7 @@ def from_weights(df,
         hist_u, bins_u = np.histogram(df[cvs[0]], bins=n_bins[0])
         hist_u = hist_u / hist_u.sum() # Normalize (sum is 1)
 
-        # Calculate weighted histogram (dist_weighted)
+        # Calculate weighted histogram (dist_reweighted)
         hist_w, bins_w = np.histogram(df[cvs[0]], bins=n_bins[0], weights=df['weights'])
         hist_w = hist_w / hist_w.sum() # Normalize (sum is 1)
 
@@ -741,7 +741,7 @@ def from_weights(df,
         fes_df = pd.DataFrame(
                     {cvs[0] : bin_centers,
                      'dist_unweighted' : hist_u,
-                     'dist_weighted' : hist_w,
+                     'dist_reweighted' : hist_w,
                      'fes' : fes})
         
         fes_df['time'] = time

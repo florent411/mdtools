@@ -24,13 +24,25 @@ import numpy as np
 #     return device
 
 def moving_average(a, n=3) :
+    """
+
+    :param a: Timeseries
+    :param n: Calculate moving average over n points. (Default value = 3)
+
+    """
     ret = np.cumsum(a, dtype=float)
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
 
 
 def prepare_ul(universes, labels):
-    ''' Do preprocessing of the universes and labels. '''
+    """
+    Do preprocessing of the universes and labels.
+
+    :param universes:
+    :param labels: 
+
+    """
 
     # Catch non-list input
     if type(universes) is not list:

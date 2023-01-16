@@ -17,12 +17,19 @@ import modules.tools as tools
 kb = 1.38064852e-23 # Boltzman's constant in m^2 kg s^-2 K^-1
 NA = 6.02214086e23 # Avogadro's constant in mol^-1
 
-def read_state_file(states_file="STATE"):
-    ''' Read states file and modify data to fit into two dataframes. 
-    1) states_data (dataframe containing the states data)
-    2) states_info (containing the extra information, such as zed value/biasfactor etc.'''
+def read_state(filename, verbose=False):
+    """
+    Read states file and modify data to fit into two dataframes.
 
-    df = pd.read_csv(states_file, delim_whitespace=True, low_memory=False)
+    :param filename: path of STATE file. 
+    :param verbose: Print what's happening. (Default value = False)
+
+    :returns: states_data: dataframe containing the STATE data.
+    :returns: states_info: containing the extra information, such as zed value/biasfactor etc.
+    """
+
+    print(f"\t-> {filename}...", end="") if verbose else 0
+    df = pd.read_csv(filename, delim_whitespace=True, low_memory=False)
 
     # Extracting all states from the dataframe and set the time as the index value
     states_data = df[~df.iloc[:,1].isin(['SET', 'FIELDS'])]
@@ -36,21 +43,26 @@ def read_state_file(states_file="STATE"):
 
     # Pivot table. Now the unique variables are the column names
     states_info = (states_info.set_index([g, 'variable'])['value']
-                   .unstack(fill_value=0)
-                   .reset_index(drop=True)
-                   .rename_axis(None, axis=1))
+        .unstack(fill_value=0)
+        .reset_index(drop=True)
+        .rename_axis(None, axis=1))
 
     # Add a column for the time values.
     states_info['time'] = states_data['time'].unique()
-
-    # # Convert to polars dataframe
-    # states_info = pl.from_pandas(states_info)
-    # states_data = pl.from_pandas(states_data)
+    print(f"done") if verbose else 0
 
     return states_data, states_info
 
 def setup_grid_settings(cvs, grid_min, grid_max, grid_bin):
-    ''' Make small dataframe containing all grid_info for each cv.'''
+    """
+    Make small dataframe containing all grid_info for each cv.
+
+    :param cvs: 
+    :param grid_min: 
+    :param grid_max: 
+    :param grid_bin: 
+
+    """
 
     # For grid_min and grid_max if no value given, make an array of nan, if only one value is given, use it for all dimensions, otherwise use the user input.
     if grid_min == None:
@@ -85,7 +97,13 @@ def setup_grid_settings(cvs, grid_min, grid_max, grid_bin):
     return pd.DataFrame(np.vstack((grid_min, grid_max, n_bins)), columns=cvs, index=['grid_min', 'grid_max', 'n_bins'])
 
 def find_sigmas(f, type):
-    ''' See if you can find the sigma values in the first n lines of a file.'''
+    """
+    See if you can find the sigma values in the first n lines of a file.
+
+    :param f: 
+    :param type: 
+
+    """
     
     # Look in KERNELS file
     if type == 'kernels':
@@ -134,71 +152,3 @@ def find_sigmas(f, type):
     else:
         # Else result empty dict, which will result in an error.
         sys.exit(f"ERROR: Unknown type {type}. Can't find sigmas here.")
-
-def calc_conv(fes_df, unitfactor, split_fes_at, calc_fes_from, fmt, write_output=True):
-    ''' Calculate different convergence metrics given a free energy landscape.'''
-
-    time_list = fes_df['time'].unique()
-
-    # Reference distribution (p or v1)
-    reference = fes_df[fes_df['time'] == fes_df['time'].unique()[-1]]
-    
-    # cvs
-    cvs = [ x for x in reference.columns.values.tolist() if x not in ['time', 'fes']]
-    print(f"\t\tcvs: {' and '.join(cvs)}")   
-
-    kldiv_values, jsdiv_values, dalonso_values, dfe_values = [], [], [], []
-
-    for index, time in enumerate(time_list):
-        print(f"\t\tWorking on state {(index + 1)} of {len(time_list)}\t| {((index + 1)*100.0)/len(time_list):.1f}%", end='\r')
-
-        # Current distribution (q or v2)
-        current = fes_df[fes_df['time'] == time]
-
-        # Free energy estimates
-        ref_fe = reference['fes'].values
-        cur_fe = current['fes'].values
-
-        # Corresponding probability distributions
-        ref = np.exp(-ref_fe / unitfactor)
-        cur = np.exp(-cur_fe / unitfactor)
-
-        # Normalized probability distributions
-        ref_norm = ref / np.sum(ref)
-        cur_norm = cur / np.sum(cur)
-
-        # To adjust for large arear where q = 0, a Bayesian smoothing function is employed. Here a "simulation" is performed of N ideal steps, using the FE from sampling.
-        # The new adjusted probability for each of the bins is then (1 + Pi * N) / (M + N), where M is the total number of bins.
-        # N is chosen to be big enough to turn 0 values into very small values, without risking python not being able to handle the values.
-        # This effect is similar as adding very small values to all gridpoints.
-        N, M = 1e9, len(ref_norm) 
-        ref_norm_smooth = (N * ref_norm + 1) / (N + M)
-        cur_norm_smooth = (N * cur_norm + 1) / (N + M)
-            
-        # Kullback-Leibler divergence
-        kldiv_values.append(tools.kldiv(ref_norm_smooth, cur_norm_smooth))
-
-        # Jensen–Shannon divergence
-        jsdiv_values.append(tools.jsdiv(ref_norm_smooth, cur_norm_smooth))
-
-        # Alonso & Echenique metric
-        dalonso_values.append(tools.dalonso(ref_norm_smooth, cur_norm_smooth))
-
-        # DeltaFE
-        # NB: summing is as accurate as trapz, and logaddexp avoids overflows
-        cv = cvs[0]
-        fesA = -unitfactor * np.logaddexp.reduce(-1/unitfactor * current[current[cv] < split_fes_at]['fes'].values)
-        fesB = -unitfactor * np.logaddexp.reduce(-1/unitfactor * current[current[cv] > split_fes_at]['fes'].values)
-        deltaFE = fesB - fesA
-
-        dfe_values.append(deltaFE)
-        
-    print(f"\t\tWorking on state {(index + 1)} of {len(time_list)}\t| {((index + 1)*100.0)/len(time_list):.1f}%")
-
-    # Dataframe from lists
-    conv_df = pd.DataFrame({'time': time_list, 'KLdiv': kldiv_values, 'JSdiv': jsdiv_values, 'dA': dalonso_values, 'deltaFE': dfe_values})
-    conv_df.to_csv(f"conv_{'_'.join(cvs)}_{calc_fes_from}.dat", index=False, sep='\t', float_format=fmt)
-
-    print(f"\t\t--> Outputfile: conv_{'_'.join(cvs)}_{calc_fes_from}.dat")           
-
-    return conv_df
