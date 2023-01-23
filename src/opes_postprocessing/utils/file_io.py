@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 
-from http.client import GATEWAY_TIMEOUT
 from re import A
 import os
 import sys
 import numpy as np
 import pandas as pd
-import polars as pl
 from itertools import islice
 pd.options.mode.chained_assignment = None  # default='warn'
 

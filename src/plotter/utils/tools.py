@@ -40,7 +40,7 @@ def setup_format():
 
 def setup_palette(palette, n_hues=10):
     """
-    Create a seaborn palette based on a palette name or a list of colors. 
+    Create a seaborn palette based on a palette name or a list of colors.
         
     :param palette: Can be the name of an existing palette (https://www.geeksforgeeks.org/seaborn-color-palette/)
                     or a list of colors (python list of comma seperated string), from which a palette is generated.

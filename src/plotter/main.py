@@ -9,8 +9,6 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 
-from sklearn.neighbors import KernelDensity
-
 # Included submodules
 from plotter.utils import tools
 
@@ -63,7 +61,7 @@ def timeseries(df,
 
     # Extra settings per option
     alpha = 0.5 if moving_avg else 0.8
-    alpha -= 0.2 if len(variables) == 2 else 0
+    alpha -= 0.2 if n_hues > 1 else 0
 
     legend_loc = 1 if density else 0
     h_ratio = [1, 7] if len(variables) == 2 else [1]
@@ -782,38 +780,38 @@ def fes_rew(df,
     return fig, axes
 
 
-def kernels_time(kernels, save=True):
-    ''' Plot kernels over time '''
+# def kernels_time(kernels, save=True):
+#     ''' Plot kernels over time '''
 
-    # Make a copy to make sure you're not editing the original df.
-    df = df.copy()
+#     # Make a copy to make sure you're not editing the original df.
+#     df = df.copy()
 
-    # Setup default matplotlib values for layout
-    tools.setup_format()
+#     # Setup default matplotlib values for layout
+#     tools.setup_format()
 
-    # Find cvs
-    # cvs = list(kernels.loc[:, 'time': kernels.columns[kernels.columns.str.startswith('sigma')].tolist()[0]].columns.values[1:-1])
-    cvs = [cv.split("_")[-1] for cv in kernels.columns[kernels.columns.str.startswith('sigma')].tolist()]
+#     # Find cvs
+#     # cvs = list(kernels.loc[:, 'time': kernels.columns[kernels.columns.str.startswith('sigma')].tolist()[0]].columns.values[1:-1])
+#     cvs = [cv.split("_")[-1] for cv in kernels.columns[kernels.columns.str.startswith('sigma')].tolist()]
 
-    if len(cvs) == 2:
-        # Plot image
-        fig, axes = plt.subplots(figsize=(6,4))
-        p = axes.scatter(kernels[cvs[0]], kernels[cvs[1]], 
-                    c=kernels['time']/1000,
-                    cmap=plt.cm.get_cmap('Spectral'),
-                    s=0.01, label='Kernel')
-        axes.set(xlabel=cvs[0], ylabel=cvs[1])
-        plt.legend()
+#     if len(cvs) == 2:
+#         # Plot image
+#         fig, axes = plt.subplots(figsize=(6,4))
+#         p = axes.scatter(kernels[cvs[0]], kernels[cvs[1]], 
+#                     c=kernels['time']/1000,
+#                     cmap=plt.cm.get_cmap('Spectral'),
+#                     s=0.01, label='Kernel')
+#         axes.set(xlabel=cvs[0], ylabel=cvs[1])
+#         plt.legend()
 
-        cbar = plt.colorbar(p)
-        cbar.ax.set_label('Time (ns)')
+#         cbar = plt.colorbar(p)
+#         cbar.ax.set_label('Time (ns)')
 
-    # Other dimensions are not yet implemented
-    else:
-        raise Exception("Other than 2 dimensions not (yet) supported for this plot type.")
+#     # Other dimensions are not yet implemented
+#     else:
+#         raise Exception("Other than 2 dimensions not (yet) supported for this plot type.")
 
 
-    # Save image if needed.
-    tools.save_img("kernels_time.pdf") if save else 0
+#     # Save image if needed.
+#     tools.save_img("kernels_time.pdf") if save else 0
 
-    return 0
+#     return 0

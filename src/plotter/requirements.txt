@@ -1,4 +1,6 @@
+os
+sys
 numpy
-pandas
-matplotlib
 seaborn
+matplotlib
+pandas

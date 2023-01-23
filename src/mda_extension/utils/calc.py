@@ -13,7 +13,6 @@ import time
 
 # Included submodules
 import mda_extension.utils.tools as tools
-import mda_extension.utils.mp_functions as mpf
 
 def rmsd(universes,
          labels=None,

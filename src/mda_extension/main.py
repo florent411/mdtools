@@ -194,7 +194,6 @@ class OPES(MD):
             self.backpack.set(alias, value) if save else 0
 
 
-
 class Walker(MD):
     ''' Instance for an OPES walker simulation. Building on/expanding on the MD class. '''
 

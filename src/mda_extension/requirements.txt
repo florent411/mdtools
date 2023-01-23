@@ -1,9 +1,6 @@
 MDAnalysis
 numpy
 pandas
-scipy
-matplotlib
-seaborn
+tqdm
 checkarg
-pickle
-polars
+time

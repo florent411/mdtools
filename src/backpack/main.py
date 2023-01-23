@@ -89,8 +89,13 @@ class Backpack:
                 t = "pd.Dataframe"
             elif isinstance(item, (np.ndarray, np.generic) ):
                 # If numpy array show first and last two values and shape.
-                content = f"Array: [{', '.join(map(str, value[:2]))}...{', '.join(map(str, value[-2:]))}]"
+                content = f"np.array: [{', '.join(map(str, value[:2]))}, ..., {', '.join(map(str, value[-2:]))}]"
                 shape = f"Shape: {np.shape(item)}"
+                t = type(value)
+            elif isinstance(item, list):
+                # If numpy array show first and last two values and shape.
+                content = f"list: [{', '.join(map(str, value[:2]))}, ..., {', '.join(map(str, value[-2:]))}]"
+                shape = f"Shape: {np.asarray(content).shape}"
                 t = type(value)
             else:
                 # Otherwise just output the value
