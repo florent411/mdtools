@@ -30,6 +30,7 @@ setuptools.setup(name='mdtools',
                     'checkarg',
                     'torch',
                     'datetime',
+                    'kneed',
                     'tqdm'
                 ],
                 zip_safe=False)

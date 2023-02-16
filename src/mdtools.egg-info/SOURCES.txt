@@ -3,6 +3,10 @@ README.md
 setup.py
 src/backpack/__init__.py
 src/backpack/main.py
+src/conserved_atoms/__init__.py
+src/conserved_atoms/main.py
+src/conserved_atoms/utils/__init__.py
+src/conserved_atoms/utils/tools.py
 src/mda_extension/__init__.py
 src/mda_extension/main.py
 src/mda_extension/utils/__init__.py

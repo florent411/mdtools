@@ -1,4 +1,5 @@
 backpack
+conserved_atoms
 mda_extension
 opes_postprocessing
 plotter

@@ -50,7 +50,11 @@ def prepare_ul(universes, labels):
 
     # Catch None values
     if labels == None:
-        labels = [*range(len(universes))]
+        try: 
+            labels = [u.origin for u in universes]
+        except:
+            labels = [*range(len(universes))]
+            
     elif type(labels) is not list:
         labels = [labels]
 
