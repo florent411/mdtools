@@ -1,6 +1,6 @@
 #!/usr/bin/env python 
 
-''' General tools '''
+''' General tools for the plotter module'''
 
 import os
 import sys

@@ -1,7 +1,6 @@
 import setuptools
 
-with open("README.md",
-    "r") as fh:
+with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(name='mdtools',
@@ -30,7 +29,6 @@ setuptools.setup(name='mdtools',
                     'checkarg',
                     'torch',
                     'datetime',
-                    'kneed',
                     'tqdm'
                 ],
                 zip_safe=False)
