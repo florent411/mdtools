@@ -4,15 +4,16 @@ import sys
 import numpy as np
 import pandas as pd
 
+import warnings
 from tqdm import tqdm
+from datetime import datetime
+import argparse
 
 from scipy import stats
 from sklearn.cluster import MeanShift, DBSCAN
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
-
-# from kneed import KneeLocator
-
+import MDAnalysis as mda
 from MDAnalysis.analysis import align as align
 
 from conserved_atoms.utils import tools
@@ -26,6 +27,7 @@ def calc_density(u,
                  target='OH2',
                  align_on='CA',
                  unwrap=False,
+                 write_traj=True,
                  verbose=True,
                  ):
     """
@@ -33,9 +35,11 @@ def calc_density(u,
     
     :param u: MDAnalysis universe, including a trajectory.
     :param pocket_definition: How to define the binding pocket or area in which to calculate density. (See par 3.1.4 on https://docs.mdanalysis.org/stable/documentation_pages/selections.html)
-    :param atom_name: What is the name of the atom you want to calculate the density for in the trajectory. (OH2 is the oxygen atom of the water molecules)
-    :param align: Align the trajectory on the atoms in the binding pocket.
-    :param verbose: Allow printing
+    :param align_on: Align the trajectory on the atoms in the binding pocket.
+    :param target: What is the name of the atom you want to calculate the density for in the trajectory? (OH2 is the oxygen atom of the water molecules)
+    :param unwrap: 
+    :param write_traj: Write trajectory aligned to the defined pocket into pocket.xtc.
+    :param verbose: Allow printing.
 
     :return: df containing the coordinates and density of all atoms in selection.
     """
@@ -48,9 +52,9 @@ def calc_density(u,
             protein.unwrap(compound='fragments')
 
     if align_on:
-        print("Aligning...", end="") if verbose else 0
-        print(f":Warning! - Aligning trajectory on {pocket_definition} and name {target}. You might have to realign if you want to calculate other variables that depend on relative distances.") if verbose else 0
+        print(f"Aligning trajectory on {pocket_definition} and name {align_on}.\n(Note: You might have to realign if you want to calculate other variables that depend on relative distances.)") if verbose else 0
 
+        print("Aligning...", end="") if verbose else 0
         align.AlignTraj(u,  # trajectory to align (mobile)
                         u,  # reference (ref)
                         select=f"protein and name {align_on} and ({pocket_definition})",  # selection of atoms to align
@@ -60,11 +64,24 @@ def calc_density(u,
         
         print("done") if verbose else 0
 
+        if write_traj:
+            print("Writing trajectory into pocket.xtc...", end="") if verbose else 0
+
+            protein = u.select_atoms('protein')
+
+            protein.write("pocket.gro")
+            with mda.Writer("pocket.xtc", protein.n_atoms) as W:
+                for ts in u.trajectory:
+                    W.write(protein)
+            print("done") if verbose else 0
+
     # Make selection. Updating is to make sure you update selection each frame.
     selection = u.select_atoms(f"(name {target}) and {pocket_definition}", updating=True)
     
     # Extract from each frame the positions (x, y, z) of the selected atoms, the id and the time.
-    arr = np.concatenate([np.c_[selection.atoms.positions, selection.atoms.ids, selection.atoms.names, np.repeat(i.time / 1000, len(selection.atoms.positions))] for i in tqdm(u.trajectory, desc='Extracting atoms: ', unit='frames')]) 
+    print("Extracting atoms...", flush=True, end="") if verbose else 0
+    arr = np.concatenate([np.c_[selection.atoms.positions, selection.atoms.ids, selection.atoms.names, np.repeat(i.time / 1000, len(selection.atoms.positions))] for i in u.trajectory]) 
+    print("done") if verbose else 0
 
     # Turn into dataframe and determine dtypes
     df = pd.DataFrame(arr, columns = ['x','y','z', 'id', 'name', 'time'])
@@ -276,11 +293,20 @@ def cluster(df,
     # Calculate cluster occupancy. 
     df_summary['occupancy'] = df_summary['size'] / n_frames
 
+    # Set the occupancy to nan for all outliers
+    df_summary.loc[df_summary.index == -1, 'occupancy'] = np.nan
+
+    # Index ['cluster_id'] to column
+    df_summary.reset_index(names=['cluster_id'], inplace=True)
+
+    # Add occupancy column to df_clustered.
+    df_clustered = pd.merge(df_clustered, df_summary[['cluster_id', 'occupancy']], on='cluster_id')
 
     return df_clustered, df_summary
 
 def voxelize(df,
              resolution=0.03,
+             compact_by='mean',
              verbose=True):
     """
     Voxelizes a point cloud by grouping nearby points into a single point.
@@ -294,7 +320,9 @@ def voxelize(df,
     print("Voxelizing...", end="") if verbose else 0
     
     # Make copy to not be editing the original dataframe.
-    df_voxelized = df.copy()
+    # I only use the numeric data, otherwise you can get problems with the groupby function.
+    # You can use the undocumented function _get_numeric_data() to filter only numeric columns:
+    df_voxelized = df._get_numeric_data().copy()
 
     # Scale the points to be between 0 and 1
     scaler = MinMaxScaler()
@@ -308,17 +336,300 @@ def voxelize(df,
     df_voxelized.loc[:, ['x', 'y', 'z']] = voxelized_points
 
     # Only keep the unique points
-    df_voxelized = df_voxelized.groupby(['x', 'y', 'z'], as_index=False).mean()
+    if compact_by == 'mean':
+        df_voxelized = df_voxelized.groupby(['x', 'y', 'z'], as_index=False).mean()
+    elif compact_by == 'max':
+        df_voxelized = df_voxelized.groupby(['x', 'y', 'z'], as_index=False).max()
+    elif compact_by == 'min':
+        df_voxelized = df_voxelized.groupby(['x', 'y', 'z'], as_index=False).min()
+    else:
+        print(f"ERROR: compact_by type {compact_by} is not supported. Please select 'mean', 'max' or 'min'")
+        sys.exit(1)
 
     print("done") if verbose else 0
-    print(f"Reduced number of points from {len(df)} to {len(df_voxelized)} points.") if verbose else 0
-    print(f"That's a {(len(df) - len(df_voxelized))/len(df):.0%} reduction.") if verbose else 0
+    print(f"Reduced number of points from {len(df)} to {len(df_voxelized)} points. ({(len(df) - len(df_voxelized))/len(df):.0%} reduction)") if verbose else 0
 
     return df_voxelized
 
+def write_pdb(df,
+              output='conserved_atoms.pdb',
+              skip_outliers=True,
+              verbose=True):
+
+    """
+    Write a pdb file with the points given in the dataframe.
+    
+    :param df: Dataframe contaning at at least ['x', 'y', 'z'] columns. If an occupancy or density column is found, these are used as b-factor.
+    :param skip_outliers: Skip all points that are not part of a cluster (cluster -1), i.e. the outliers.
+    :param verbose: Allow printing.
+
+    :return: True
+    """
+
+    print(f"Writing {output}...", end="") if verbose else 0
+
+    # Check that the dataframe contains at least x, y and z columns.
+    assert set(['x', 'y', 'z']).issubset(df.columns),\
+            f"Dataframe should contain at least 'x', 'y', 'z' columns.\nOnly found the following columns: {df.columns.values}"
+
+    if len(df) > 10000:
+        # If dataframe is too large, raise a warning and suggest voxelization
+        warnings.warn(f'''
+WARNING: Your dataframe is very large ({len(df)} points).
+We recommend to voxelize your data using the following function:
+
+df_vox = conserved_atoms.voxelize(df)
+
+and the rerunning this command:
+
+conserved_atoms.write_pdb(df_vox)''')
+
+        # Ask the user if they want to continue
+        response = input("Do you want to continue? (y/N)")
+
+        # If the user doesn't want to continue, raise an exception
+        if response.lower() not in ['Y', 'y']:
+            raise Exception("Now exiting.")
+
+    # Make copy to not be editing the original dataframe and remove outliers if needed.
+    if skip_outliers:
+        df = df[df['cluster_id'] != -1].copy()
+    else:
+        df = df.copy()
+
+    # Reset index and turn it into a column to create the atomserial. (Just a list from 1-n)
+    df.reset_index(drop=True, inplace=True)
+    df['atomserial'] = df.index + 1
+
+    # If the dataframe contains a density column, normalize it on a scale from 0 to 100
+    # This will be put in the B-factor column of the pdb file.
+    if 'density' in df.columns:
+        scaler = MinMaxScaler((0, 100))
+        df['density'] = scaler.fit_transform(df['density'].values.reshape(-1,1))
+
+    # Write output in pdb files (for pymol etc.)
+    with open(output, "w") as wf:
+
+        # Print header with some information
+        header = f'''# This .pdb file was created on {datetime.now().strftime("%d/%m/%Y %H:%M:%S")} using MDTools - Conserved Atoms.
+#
+# Note: The occupancy represents the fraction of time an atom of that cluster is found over the analysed simulation time. 0.0 - 1.0
+#       The B-factor here represents the atomdensity normalized to a scale from 0 - 100. (Where 0 is lowest density and 100 is highest density.)
+'''
+
+        wf.write(header)
+
+        # Write dataframe in .pdb format.
+        for i, (_, row) in enumerate(df.iterrows()):
+            
+            # Make line
+            printLine = '''\
+{atomlabel:<4} {atomSerial:>6}  {atomName:<3} {resName:<3} {chainId} {resNum:>3}    {x:>8.3f}{y:>8.3f}{z:>8.3f}  {occupancy:>4.2f} {b_factor:>6.2f}         {element:>2}\
+\n'''.format(atomlabel="ATOM",
+            atomSerial=i,
+            atomName=row['name'] if 'name' in df.columns else 'C',
+            resName="CLS",
+            chainId="Z",
+            resNum=int(row['cluster_id']),
+            x=row['x'],
+            y=row['y'],
+            z=row['z'],
+            occupancy=min(1, row['occupancy']) if 'occupancy' in df.columns else 0.0,
+            b_factor=row['density'] if 'density' in df.columns else 0.0,
+            element='O')
+
+            wf.write(printLine)
+
+    print("done") if verbose else 0
+
+    return
+
+def write_dat(df,
+              output='conserved_atoms.dat',
+              verbose=True):
+
+    """
+    Write a pdb file with the points given in the dataframe.
+    
+    :param df: Dataframe contaning at at least ['x', 'y', 'z'] columns. If an occupancy or density column is found, these are used as b-factor.
+    :param resolution: float specifying the size of the voxel grid
+
+    :return: df where the x, y and z coordinates are voxelized and the mean is taken for all remaining columns.
+    """
+
+    print(f"Writing {output}...", end="") if verbose else 0
+
+    # Format for all column types
+    float_formats = {'x' : '%10.6f',
+                    'y' : '%10.6f',
+                    'z' : '%10.6f',
+                    'x_std' : '%10.6f',
+                    'y_std' : '%10.6f',
+                    'z_std' : '%10.6f',
+                    'radius' : '%8.4f',
+                    'radius_std' : '%8.4f',
+                    'id' : '%6d',
+                    'name' : '%3s',
+                    'mahalanobis' : '%12.4e',
+                    'size' : '%5d',
+                    'p' : '%12.4e',
+                    'time' : '%6.2f',
+                    'density' : '%12.4e',
+                    'occupancy' : '%6.2f',
+                    'cluster_id' : '%2d',
+                    'index' : '%6d'}
+
+    # Get the ones corresponding to the columns in the dataframes.
+    fmt_list = [float_formats[c] if c in float_formats else '%s' for c in df.columns.values]
+
+    # write the dataframe to a csv file with different alignment parameters for different columns
+    np.savetxt(output, df.values, fmt=fmt_list,  delimiter='\t', header='\t'.join(df.columns), comments='')
+
+    print("done") if verbose else 0
+
+    return
 
 if __name__ == "__main__":
     
-    # TODO
-    pass
+    # Setup argparse (allowing the use of flags)
+    parser = argparse.ArgumentParser(description='Find conserved atoms.')
+
+    # Adding flags
+    # Optional flags (See help for explanation)
+    parser.add_argument('-s',
+                        '--structure',
+                        nargs='?',
+                        default='run.pdb',
+                        type=str,
+                        help='Structure file. (default: %(default)s)')
+
+    parser.add_argument('-f',
+                        '--trajectory',
+                        nargs='?',
+                        default='run.xtc',
+                        type=str,
+                        help='Trajectory file. (default: %(default)s)')
+
+    parser.add_argument('-o',
+                        '--output_dir',
+                        nargs='?',
+                        default='./conserved_atoms',
+                        type=str,
+                        help='Align trajectory on. (default: %(default)s)')
+
+    parser.add_argument('-p',
+                        '--pocket_definition',
+                        nargs='?',
+                        default='point 0.0 0.0 0.0 15',
+                        type=str,
+                        help='Definition of pocket to analyse. (default: %(default)s)')
+
+    parser.add_argument('-a',
+                        '--align_on',
+                        nargs='?',
+                        default='CA',
+                        type=str,
+                        help='Align trajectory on. (default: %(default)s)')
     
+    parser.add_argument('-t',
+                        '--target',
+                        nargs='?',
+                        default='OH2',
+                        type=str,
+                        help='Atom name of target atoms. (default: %(default)s)')
+
+    parser.add_argument('-e',
+                        '--element',
+                        nargs='?',
+                        default='O',
+                        type=str,
+                        help='Element. (default: %(default)s)')
+       
+    parser.add_argument('-v',
+                        '--verbose',
+                         action='store_true')
+
+
+    # Rename variables from flags
+    args = parser.parse_args()
+
+    structure = args.structure
+    trajectory = args.trajectory
+    output_dir = args.output_dir
+    pocket_definition = args.pocket_definition
+    align_on = args.align_on
+    target = args.target
+    element = args.element
+    verbose = args.verbose
+
+    # Print start
+    print("Starting conserved_atoms.py")
+
+    # Reset directory
+    tools.reset(output_dir, verbose=verbose)
+
+    # Setup MDAnalysis Universe
+    u = mda.Universe(structure, trajectory)
+
+    # Define binding pocket
+    df = calc_density(u,
+                      pocket_definition=pocket_definition,
+                      target=target,
+                      align_on=align_on,
+                      unwrap=False,
+                      write_traj=False,
+                      verbose=verbose)
+
+    # Perform clustering
+    df_clustered, df_summary = cluster(df,
+                                       u.trajectory.n_frames,
+                                       clustering_algorithm='dbscan',
+                                       epsilon=0.1,
+                                       density_cutoff=None,
+                                       atomic_radius=None,
+                                       element=element,
+                                       outlier_treshold=0.01,
+                                       verbose=verbose)
+
+    print(f"Found {len(df_summary) - 1} clusters.")
+
+    print(f"Writing output in {output_dir}")
+    # Output the whole lot into files
+    write_pdb(df_summary,
+              output=f'{output_dir}/clusters_summary.pdb',
+              skip_outliers=True,
+              verbose=verbose)
+
+    write_dat(df_summary,
+              output=f'{output_dir}/clusters_summary.dat',
+              verbose=verbose)
+
+    if len(df_clustered) < 10000:   
+        write_pdb(df_clustered,
+                  output=f'{output_dir}/clusters_all.dat',
+                  skip_outliers=True,
+                  verbose=verbose)
+    else:
+        print(f"Not outputing clusters_all.pdb, as the number of points in is too large ({len(df_clustered)} > 10k)")
+
+    write_dat(df_clustered,
+            output=f'{output_dir}/clusters_all.dat',
+            verbose=verbose)
+
+    # Voxelize dataframe to reduce number of datapoints.
+    df_vox = voxelize(df_clustered)
+
+    write_pdb(df_vox,
+              output=f'{output_dir}/clusters_vox.pdb',
+              skip_outliers=True,
+              verbose=verbose)
+
+    write_dat(df_vox,
+              output=f'{output_dir}/clusters_vox.dat',
+              verbose=verbose)
+
+
+
+
+
+

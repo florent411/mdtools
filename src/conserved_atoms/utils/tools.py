@@ -3,7 +3,7 @@
 ''' General tools for conserved_atoms protocol '''
 
 import os
-import sys
+import shutil
 import numpy as np
 import pandas as pd
 from scipy.spatial import ConvexHull
@@ -58,3 +58,23 @@ def get_cluster_radii(df):
     df_rad.set_index('cluster_id', inplace=True)
 
     return df_rad
+
+def reset(path, verbose):
+    """
+    Check if folder exists. If so, delete old one and make new one.
+    """
+
+    if not os.path.exists(path):
+        print(f"Making {path}...", flush=True, end="") if verbose else 0
+        os.makedirs(path)
+        print("done") if verbose else 0
+    else:
+        print(f"Deleting {path}*...", flush=True, end="") if verbose else 0
+        shutil.rmtree(path)
+        print("done") if verbose else 0
+
+        print(f"Making {path}...", flush=True, end="") if verbose else 0
+        os.makedirs(path)
+        print("done") if verbose else 0
+
+    return 0
