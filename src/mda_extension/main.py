@@ -152,7 +152,7 @@ class OPES(MD):
                 print(f"\t-> Walker {i}...", end="") if self.verbose else 0
                 self.walkers.append(Walker(root=f"{self.root}/{path}",
                                            topology=f"../run_prot.pdb",
-                                           trajectory=f"run.xtc",
+                                           trajectory=os.path.basename(trajectory[i]),
                                            prefix=walker_prefix,
                                            id=i,
                                            colvar=f"COLVAR.{i}",

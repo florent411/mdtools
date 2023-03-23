@@ -15,6 +15,8 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 import MDAnalysis as mda
 from MDAnalysis.analysis import align as align
+from MDAnalysis.coordinates.memory import MemoryReader
+from MDAnalysis.analysis.base import AnalysisFromFunction
 
 from conserved_atoms.utils import tools
 
@@ -27,7 +29,7 @@ def calc_density(u,
                  target='OH2',
                  align_on='CA',
                  unwrap=False,
-                 write_traj=True,
+                 write_traj=False,
                  verbose=True,
                  ):
     """
@@ -293,8 +295,8 @@ def cluster(df,
     # Calculate cluster occupancy. 
     df_summary['occupancy'] = df_summary['size'] / n_frames
 
-    # Set the occupancy to nan for all outliers
-    df_summary.loc[df_summary.index == -1, 'occupancy'] = np.nan
+    # Set values to nan for all outliers
+    df_summary.loc[df_summary.index == -1, ['occupancy', 'x', 'y', 'z', 'x_std', 'y_std', 'z_std', 'radius', 'radius_std']] = np.nan
 
     # Index ['cluster_id'] to column
     df_summary.reset_index(names=['cluster_id'], inplace=True)
@@ -307,6 +309,8 @@ def cluster(df,
 def voxelize(df,
              resolution=0.03,
              compact_by='mean',
+             skip_outliers=True,
+             
              verbose=True):
     """
     Voxelizes a point cloud by grouping nearby points into a single point.
@@ -322,7 +326,14 @@ def voxelize(df,
     # Make copy to not be editing the original dataframe.
     # I only use the numeric data, otherwise you can get problems with the groupby function.
     # You can use the undocumented function _get_numeric_data() to filter only numeric columns:
-    df_voxelized = df._get_numeric_data().copy()
+    # And remove outliers if needed.
+    if skip_outliers:
+        try:
+            df_voxelized = df[df['cluster_id'] != -1]._get_numeric_data().copy()
+        except Exception as e:
+            print(f"Warning: {e}")
+            print("Continuing without removing outliers.")
+            df_voxelized = df._get_numeric_data().copy()
 
     # Scale the points to be between 0 and 1
     scaler = MinMaxScaler()
@@ -378,7 +389,7 @@ def write_pdb(df,
 WARNING: Your dataframe is very large ({len(df)} points).
 We recommend to voxelize your data using the following function:
 
-df_vox = conserved_atoms.voxelize(df)
+df_vox = conserved_atoms.voxelize(df_clustered)
 
 and the rerunning this command:
 
@@ -393,7 +404,11 @@ conserved_atoms.write_pdb(df_vox)''')
 
     # Make copy to not be editing the original dataframe and remove outliers if needed.
     if skip_outliers:
-        df = df[df['cluster_id'] != -1].copy()
+        try:
+            df = df[df['cluster_id'] != -1].copy()
+        except Exception as e:
+            print(f"Warning: {e}")
+            print("Continuing without removing outliers.")
     else:
         df = df.copy()
 
@@ -453,6 +468,7 @@ def write_dat(df,
     
     :param df: Dataframe contaning at at least ['x', 'y', 'z'] columns. If an occupancy or density column is found, these are used as b-factor.
     :param resolution: float specifying the size of the voxel grid
+    :param verbose: Allow printing.
 
     :return: df where the x, y and z coordinates are voxelized and the mean is taken for all remaining columns.
     """
@@ -488,6 +504,104 @@ def write_dat(df,
     print("done") if verbose else 0
 
     return
+
+def create_traj(u,
+                df,
+                write_struct_to='conserved_atoms.gro',
+                write_traj_to='conserved_atoms.xtc',
+                element='O',
+                name='OH2',
+                skip_outliers=True,
+                verbose=True):
+
+    """
+    Create trajectory containing the conserved atoms merged with the trajectory used for analysis.
+    
+    :param u: MD Analysis universe used for the conserved atoms algorithm.
+    :param df: Dataframe contaning at at least ['x', 'y', 'z', 'cluster_id', 'time'] columns. This is most likely the df_clustered which is outputted by conserved_atoms.cluster().
+    :param write_to: Write output into this file.
+    :param verbose: Allow printing.
+
+    :return combined_u: Combined MDAnalysis universe.
+    """
+
+    print(f"Creating universe for conserved atom clusters...", end="") if verbose else 0
+
+    # Make copy to not be editing the original dataframe and remove outliers if needed.
+    if skip_outliers:
+        df = df[df['cluster_id'] != -1][['cluster_id', 'time', 'x', 'y', 'z']].copy()
+    else:
+        df = df[['cluster_id', 'time', 'x', 'y', 'z']].copy()
+
+
+    # Setup variables for new Universe.
+    n_residues = len(df['cluster_id'].unique())
+    n_atoms = len(df['cluster_id'].unique())
+    resindices = np.repeat(range(n_residues), 1)
+    assert len(resindices) == n_atoms
+    segindices = [0] * n_residues
+
+    # create the Universe
+    clusters_u = mda.Universe.empty(n_atoms,
+                                    n_residues=n_residues,
+                                    atom_resindex=resindices,
+                                    residue_segindex=segindices,
+                                    trajectory=True) # necessary for adding coordinates
+
+    # Add attributes
+    clusters_u.add_TopologyAttr('name', [name] * n_residues)
+    clusters_u.add_TopologyAttr('type', [element] * n_residues)
+    clusters_u.add_TopologyAttr('resname', ['CLS'] * n_residues)
+    clusters_u.add_TopologyAttr('resid', list(range(n_residues)))
+    clusters_u.add_TopologyAttr('segid', ['conserved_atoms'])
+
+
+    # Create an array containing the coordinates for the whole trajectory. All clusters that are not present are placed at [0., 0., 0.].
+    # Get all possible combinations of time and cluster_id
+    time_values = df['time'].unique()
+    cluster_id_values = df['cluster_id'].unique()
+    idx = pd.MultiIndex.from_product([time_values, cluster_id_values], names=['time', 'cluster_id'])
+
+    # Reindex the dataframe to include all combinations and fill NaN value with zeros.
+    df_mi = df.set_index(['time', 'cluster_id']).reindex(idx).fillna(value=0.)
+
+    # sort, convert to numpy array and reshape
+    cluster_coords = df_mi.sort_values(by=['time', 'cluster_id']).to_numpy().reshape((len(time_values), len(cluster_id_values), 3))
+
+    # Add coordinates to the trajectory
+    clusters_u.load_new(cluster_coords, format=MemoryReader)
+
+    print("done") if verbose else 0
+
+
+    print(f"Merging with main universe...", end="") if verbose else 0
+
+    # Getting coordinates for both universers and
+    universe_coords = AnalysisFromFunction(lambda ag: ag.positions.copy(), u.atoms).run().results.timeseries
+    cluster_coords = AnalysisFromFunction(lambda ag: ag.positions.copy(), clusters_u.atoms).run().results.timeseries
+
+    merged_coords = np.hstack([universe_coords, cluster_coords])
+
+    # Create combined universe
+    combined_u = mda.Merge(u.atoms, clusters_u.atoms)
+    combined_u.load_new(merged_coords, format=MemoryReader)
+
+    print("done") if verbose else 0
+
+    # Write structure file
+    if write_struct_to:
+        print(f"Writing structure file to {write_struct_to}...", end="") if verbose else 0
+        pass
+        print("done") if verbose else 0
+
+    # Write trajectory
+    if write_traj_to:
+        print(f"Writing trajectory to {write_traj_to}...", end="") if verbose else 0
+        pass
+        print("done") if verbose else 0
+
+
+    return combined_u
 
 if __name__ == "__main__":
     

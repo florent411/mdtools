@@ -6,5 +6,4 @@ MDAnalysis
 checkarg
 torch
 datetime
-kneed
 tqdm
