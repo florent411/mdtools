@@ -533,7 +533,6 @@ def create_traj(u,
     else:
         df = df[['cluster_id', 'time', 'x', 'y', 'z']].copy()
 
-
     # Setup variables for new Universe.
     n_residues = len(df['cluster_id'].unique())
     n_atoms = len(df['cluster_id'].unique())
@@ -658,7 +657,14 @@ if __name__ == "__main__":
                         default='O',
                         type=str,
                         help='Element. (default: %(default)s)')
-       
+
+    parser.add_argument('-w',
+                        '--write',
+                        nargs='?',
+                        default='./conserved_atoms/conserved_atoms.{gro,xtc}',
+                        type=str,
+                        help='Write trajectorty Element. (default: %(default)s)')
+
     parser.add_argument('-v',
                         '--verbose',
                          action='store_true')
@@ -742,8 +748,17 @@ if __name__ == "__main__":
               output=f'{output_dir}/clusters_vox.dat',
               verbose=verbose)
 
+    # Create output files
+    create_traj(u,
+                df_clustered,
+                element=element,
+                write_struct_to=f'{output_dir}/conserved_atoms.gro',
+                write_traj_to=f'{output_dir}/conserved_atoms.xtc',
+                name=target,
+                skip_outliers=True,
+                verbose=verbose)
 
-
+    print("Finished.")
 
 
 
