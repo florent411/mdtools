@@ -8,6 +8,8 @@ import pandas as pd
 
 import seaborn as sns
 from matplotlib import pyplot as plt
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 
 # Included submodules
 from plotter.utils import tools
@@ -815,3 +817,103 @@ def fes_rew(df,
 #     tools.save_img("kernels_time.pdf") if save else 0
 
 #     return 0
+
+
+def conv_params(df,
+                variables=None,
+                colors=['#A43820', '#A43820', '#A43820'],
+                inset_last_perc=20,
+                label_dict=None,
+                save=True,
+                **kwargs):
+    """
+    Plot convergence parameters. ('KLdiv', 'JSdiv' and 'dAlonso')
+    
+    :param df: Input dataframe. Needs at least the columns 'time' and ('KLdiv', 'JSdiv' and/or 'dAlonso')
+    :param colors: Colormap
+    :param label_dict: Linking codes/column names with a more elaborate title to plot on the axes
+    :param save:  Save image in the ./img folder.
+
+    :return: fig and axes
+    """
+
+    # Make a copy to make sure you're not editing the original df.
+    df = df.copy()
+
+    # First find the variables in the input dataframe
+    column_names = df.columns.to_list()
+    variables = [x for x in column_names if x not in ['time']]
+
+    # What is the cutoff for the x-axis, as a fraction of the total. (e.g. if you cutoff last 20%, x_min_frac = 0.8)
+    x_min_frac = (100 - inset_last_perc) / 100
+
+    # You can assert list to confirm list is not empty
+    assert list, f"No variables found.\nOnly found the following column(s): {df.columns.values}"
+
+    # Setup default matplotlib values for layout
+    tools.setup_format()
+
+    fig, axes = plt.subplots(len(variables), sharex=True, figsize=(8, (2 * len(variables))))
+    plt.subplots_adjust(wspace=0, hspace=0)
+
+    for index, variable in enumerate(variables):
+        
+        # Plot data
+        sns.lineplot(data=df,
+                     x='time',
+                     y=variable,
+                     color=colors[index % len(colors)],
+                     linewidth=2,
+                     ax=axes[index])
+
+        # Make an inset ax and plot the values.
+        ax_ins = inset_axes(axes[index],
+                          width="40%", # width = 40% of parent_bbox
+                          height=0.8, # height : 0.8 inch
+                          loc=1)
+        
+        # Setup x-range to be x percent of the total dataset.
+        ax_ins.set_xlim(df['time'].max() * x_min_frac, df['time'].max())
+
+        # Setup y-range of the inset. You want to plot the full range in that particular last x percent. Use the margin for 10% extra whitespace around the lines.
+        data_range = df[variable][int(len(df) * x_min_frac):].max() - df[variable][int(len(df) * x_min_frac):].min()
+        margin = 0.1 * data_range
+        ymin = df[variable][int(len(df) * x_min_frac):].min() - margin
+        ymax = df[variable][int(len(df) * x_min_frac):].max() + margin
+        ax_ins.set_ylim(ymin, ymax)
+        
+        # Plot data into inset.
+        sns.lineplot(data=df,
+                     x='time',
+                     y=variable,
+                     color=colors[index % len(colors)],
+                     linewidth=2,
+                     ax=ax_ins)
+
+        # Remove/resize labels and ticks
+        ax_ins.tick_params(axis='y', labelsize=10)
+        ax_ins.set(xticklabels=[])  # remove the tick labels
+        ax_ins.tick_params(left=False, bottom=False)  # remove the ticks
+        ax_ins.set(xlabel=None, ylabel=None)
+
+        # Add text in the upper right corner.
+        # The transform=ax.transAxes argument specifies that the coordinates for the text are in axis-relative coordinates (0 to 1). 
+        ax_ins.text(0.96, 0.9, f"last {float(inset_last_perc):.0f}%", transform=ax_ins.transAxes, horizontalalignment='right', verticalalignment='top', size=10)
+
+        # Mark the inset in the regular plot and connect it to the inset.
+        mark_inset(axes[index], ax_ins, loc1=3, loc2=4, fc="none", ec="0.5")        
+
+
+        # Some more layout options
+
+        # Add the proper labels for each axes
+        try:
+            axes[index].set(xlabel="Time (ns)", ylabel=label_dict[variables[index]])
+        except:
+            print("Warning: couldn't find the labels in the label dict.")
+            axes[index].set(xlabel="Time (ns)", ylabel=variables[index])
+        
+    # Save image if needed.
+    tools.save_img(f"conv_params.pdf") if save else 0
+
+    return fig, axes

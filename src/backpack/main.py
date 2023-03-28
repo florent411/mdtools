@@ -30,7 +30,7 @@ class Backpack:
             print(f"! Warning:\tNo database was found at {location}") if self.verbose else 0
             print(f"\t\tCreating new database.") if self.verbose else 0
             self.db = {}
-        return True
+        return
 
     def _load(self):
         ''' Load database from file. '''
@@ -42,7 +42,7 @@ class Backpack:
             with open(self.location, 'wb') as handle:
                 pickle.dump(self.db, handle, protocol=-1)
 
-            return True
+            return
         except Exception as e:
             print(f"! ERROR: Could not dump database into {self.location}") if self.verbose else 0
             print(f"\t{e}") if self.verbose else 0
@@ -54,7 +54,7 @@ class Backpack:
         self.db[str(key)] = value
         self.dump()
             
-        return True
+        return
 
     def get(self, key):    
         
@@ -65,7 +65,7 @@ class Backpack:
             return False
         del self.db[key]
         self.dump()
-        return True
+        return
 
     def list(self):
         print(f"   {'Key':<20}{'Type':<30}{'Content/Value':<60}Shape")
@@ -105,4 +105,4 @@ class Backpack:
                 t = type(value)
 
             print(f"-> {key:<20}{str(t):<30}{str(content):<60}{shape}")
-        return True
+        return

@@ -48,10 +48,15 @@ def calc_density(u,
 
     # Align trajectory
     if unwrap:
+        # Unwrap protein
         protein = u.select_atoms('protein')
+        not_protein = u.select_atoms('not protein')
 
-        for ts in tqdm(u.trajectory, desc='Unwrapping: ', unit='frames'):
-            protein.unwrap(compound='fragments')
+        transforms = [trans.unwrap(u.atoms),
+                    trans.center_in_box(protein, wrap=True),
+                    trans.wrap(u.atoms, compound='fragments')]
+
+        u.trajectory.add_transformations(*transforms)
 
     if align_on:
         print(f"Aligning trajectory on {pocket_definition} and name {align_on}.\n(Note: You might have to realign if you want to calculate other variables that depend on relative distances.)") if verbose else 0

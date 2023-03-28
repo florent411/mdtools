@@ -15,7 +15,7 @@ import checkarg.list as Guard
 # Included submodules from the mdtools package
 from backpack.main import Backpack
 
-from opes_postprocessing.utils import calc_fes #, calc_div 
+from opes_postprocessing.utils import calc_fes , calc_conv
 
 from mda_extension.utils import tools
 from mda_extension.utils import file_io
@@ -175,11 +175,12 @@ class OPES(MD):
                       'rg': calc.rg,
                       'rmsd': calc.rmsd,
                       'rmsf': calc.rmsf,
+                      'conv_params' : calc_conv.conv_params,
         }
                     #   'fes_kernels' : calc_fes.from_kernels,
-                    #   'kldiv' : calc_div.kldiv,
-                    #   'jsdiv' : calc_div.jsdiv,
-                    #   'dalonso' : calc_div.dalonso,
+                    #   'kldiv' : calc_conv.kldiv,
+                    #   'jsdiv' : calc_conv.jsdiv,
+                    #   'dalonso' : calc_conv.dalonso,
                     #   'mindist': calc.mindist,
         
         # Run the requested function, with the given arguments
