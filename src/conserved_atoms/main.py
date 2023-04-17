@@ -17,6 +17,7 @@ import MDAnalysis as mda
 from MDAnalysis.analysis import align as align
 from MDAnalysis.coordinates.memory import MemoryReader
 from MDAnalysis.analysis.base import AnalysisFromFunction
+import MDAnalysis.transformations as trans
 
 from conserved_atoms.utils import tools
 
@@ -48,6 +49,7 @@ def calc_density(u,
 
     # Align trajectory
     if unwrap:
+        print("Unwrapping protein...", end="") if verbose else 0
         # Unwrap protein
         protein = u.select_atoms('protein')
         not_protein = u.select_atoms('not protein')
@@ -57,6 +59,7 @@ def calc_density(u,
                     trans.wrap(u.atoms, compound='fragments')]
 
         u.trajectory.add_transformations(*transforms)
+        print("done") if verbose else 0
 
     if align_on:
         print(f"Aligning trajectory on {pocket_definition} and name {align_on}.\n(Note: You might have to realign if you want to calculate other variables that depend on relative distances.)") if verbose else 0
@@ -562,13 +565,25 @@ def create_traj(u,
 
     # Create an array containing the coordinates for the whole trajectory. All clusters that are not present are placed at [0., 0., 0.].
     # Get all possible combinations of time and cluster_id
-    time_values = df['time'].unique()
+    time_values = [u.trajectory.time / 1000 for ts in u.trajectory]
     cluster_id_values = df['cluster_id'].unique()
     idx = pd.MultiIndex.from_product([time_values, cluster_id_values], names=['time', 'cluster_id'])
 
-    # Reindex the dataframe to include all combinations and fill NaN value with zeros.
-    df_mi = df.set_index(['time', 'cluster_id']).reindex(idx).fillna(value=0.)
+    # Turn df into multi index df. 
+    df_mi = df.set_index(['time', 'cluster_id'])
+    
+    # It could be that you have duplicates in your df_mi. 
+    # This is probably caused that two water molecules from the same timestep appear in the same cluster.
+    # In this case, warn the user and remove the duplicates.
+    df_difference = len(df_mi) - len(df_mi[~df_mi.index.duplicated()])
+    if df_difference > 0:
+        warnings.warn(f"On {df_difference} occasions ({df_difference / len(df_mi):.1%}), two atoms from the same timestep appear in the same cluster. Duplicates are now removed to produce a trajectory.")
 
+        df_mi = df_mi[~df_mi.index.duplicated()]
+
+    # Reindex the dataframe to include all combinations and fill NaN value with zeros.
+    df_mi = df_mi.reindex(idx).fillna(value=0.)
+      
     # sort, convert to numpy array and reshape
     cluster_coords = df_mi.sort_values(by=['time', 'cluster_id']).to_numpy().reshape((len(time_values), len(cluster_id_values), 3))
 
@@ -576,7 +591,6 @@ def create_traj(u,
     clusters_u.load_new(cluster_coords, format=MemoryReader)
 
     print("done") if verbose else 0
-
 
     print(f"Merging with main universe...", end="") if verbose else 0
 

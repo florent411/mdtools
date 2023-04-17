@@ -60,9 +60,9 @@ class MD(mda.Universe):
 
             # we define the transformation
             transforms = (transformations.unwrap(protein),
-                        transformations.center_in_box(protein, wrap=True),
-                        transformations.fit.fit_rot_trans(protein, self),
-                        transformations.wrap(not_protein))
+                          transformations.center_in_box(protein, wrap=True),
+                          transformations.fit.fit_rot_trans(protein, self),
+                          transformations.wrap(not_protein, compound='fragments'))
             self.trajectory.add_transformations(*transforms)
 
         # Create backpack which will contain all information
