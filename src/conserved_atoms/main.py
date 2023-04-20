@@ -609,15 +609,17 @@ def create_traj(u,
     # Write structure file
     if write_struct_to:
         print(f"Writing structure file to {write_struct_to}...", end="") if verbose else 0
-        pass
+        combined_u.select_atoms("all").write(f"{write_struct_to}")
         print("done") if verbose else 0
 
     # Write trajectory
     if write_traj_to:
         print(f"Writing trajectory to {write_traj_to}...", end="") if verbose else 0
-        pass
+        sel = u.select_atoms("all")
+        with mda.Writer(f"{write_traj_to}", sel.n_atoms) as W:
+            for ts in combined_u.trajectory:
+                W.write(sel)
         print("done") if verbose else 0
-
 
     return combined_u
 
