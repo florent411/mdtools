@@ -83,8 +83,8 @@ class MD(mda.Universe):
         # Available function in the calc module
         dispatcher = {'rmsd': calc.rmsd,
                       'rg': calc.rg,
-                      'rmsf': calc.rmsf}
-                      # TODO  'mindist': calc.mindist}
+                      'rmsf': calc.rmsf,
+                      'mindist': calc.mindist}
         
         # Run the requested function, with the given arguments
         value = dispatcher[key](*args, **kwargs)
@@ -175,13 +175,13 @@ class OPES(MD):
                       'rg': calc.rg,
                       'rmsd': calc.rmsd,
                       'rmsf': calc.rmsf,
+                      'mindist': calc.mindist,
                       'conv_params' : calc_conv.conv_params,
         }
                     #   'fes_kernels' : calc_fes.from_kernels,
                     #   'kldiv' : calc_conv.kldiv,
                     #   'jsdiv' : calc_conv.jsdiv,
                     #   'dalonso' : calc_conv.dalonso,
-                    #   'mindist': calc.mindist,
         
         # Run the requested function, with the given arguments
         value = dispatcher[key](*args, **kwargs)
