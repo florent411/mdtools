@@ -22,7 +22,6 @@ src/mdtools.egg-info/top_level.txt
 src/opes_postprocessing/__init__.py
 src/opes_postprocessing/main.py
 src/opes_postprocessing/utils/__init__.py
-src/opes_postprocessing/utils/calc_conv.py
 src/opes_postprocessing/utils/calc_fes.py
 src/opes_postprocessing/utils/file_io.py
 src/opes_postprocessing/utils/tools.py
