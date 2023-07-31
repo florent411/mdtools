@@ -29,18 +29,18 @@ class Backpack:
             print(f"not found") if self.verbose else 0
             print(f"! Warning:\tNo database was found at {location}") if self.verbose else 0
             print(f"\t\tCreating new database.") if self.verbose else 0
-            self.db = {}
+            self.content = {}
         return
 
     def _load(self):
         ''' Load database from file. '''
         with open(self.location, 'rb') as handle:
-            self.db = pickle.load(handle)
+            self.content = pickle.load(handle)
 
     def dump(self):
         try:
             with open(self.location, 'wb') as handle:
-                pickle.dump(self.db, handle, protocol=-1)
+                pickle.dump(self.content, handle, protocol=-1)
 
             return
         except Exception as e:
@@ -51,19 +51,19 @@ class Backpack:
     def set(self, key, value):
         
         # Set attribute
-        self.db[str(key)] = value
+        self.content[str(key)] = value
         self.dump()
             
         return
 
     def get(self, key):    
         
-        return self.db[key]
+        return self.content[key]
         
     def delete(self, key):
-        if not key in self.db:
+        if not key in self.content:
             return False
-        del self.db[key]
+        del self.content[key]
         self.dump()
         return
 
@@ -77,10 +77,10 @@ class Backpack:
         except Exception:
             print("-" * 130)
     
-        for key, value in self.db.items():
+        for key, value in self.content.items():
             
             # If you have a dataframe, output the columns and shape of the dataframe.
-            item = self.db[key]
+            item = self.content[key]
             
             if isinstance(item, pd.DataFrame):
                 # If dataframe show column names and shape.

@@ -15,7 +15,7 @@ import checkarg.list as Guard
 # Included submodules from the mdtools package
 from backpack.main import Backpack
 
-from opes_postprocessing.utils import calc_fes #, calc_div 
+from opes_postprocessing.utils import calc_fes , calc_conv
 
 from mda_extension.utils import tools
 from mda_extension.utils import file_io
@@ -60,16 +60,16 @@ class MD(mda.Universe):
 
             # we define the transformation
             transforms = (transformations.unwrap(protein),
-                        transformations.center_in_box(protein, wrap=True),
-                        transformations.fit.fit_rot_trans(protein, self),
-                        transformations.wrap(not_protein))
+                          transformations.center_in_box(protein, wrap=True),
+                          transformations.fit.fit_rot_trans(protein, self),
+                          transformations.wrap(not_protein, compound='fragments'))
             self.trajectory.add_transformations(*transforms)
 
         # Create backpack which will contain all information
         self.backpack = Backpack(location=f"{root}/{backpack}", verbose=self.verbose)
 
-        # Integrate all items from backpack database (db)
-        for key in self.backpack.db.keys():
+        # Integrate all items from backpack database
+        for key in self.backpack.content.keys():
             setattr(self, key, self.backpack.get(key))
 
     def calc(self,
@@ -83,8 +83,8 @@ class MD(mda.Universe):
         # Available function in the calc module
         dispatcher = {'rmsd': calc.rmsd,
                       'rg': calc.rg,
-                      'rmsf': calc.rmsf}
-                      # TODO  'mindist': calc.mindist}
+                      'rmsf': calc.rmsf,
+                      'mindist': calc.mindist}
         
         # Run the requested function, with the given arguments
         value = dispatcher[key](*args, **kwargs)
@@ -152,7 +152,7 @@ class OPES(MD):
                 print(f"\t-> Walker {i}...", end="") if self.verbose else 0
                 self.walkers.append(Walker(root=f"{self.root}/{path}",
                                            topology=f"../run_prot.pdb",
-                                           trajectory=f"run.xtc",
+                                           trajectory=os.path.basename(trajectory[i]),
                                            prefix=walker_prefix,
                                            id=i,
                                            colvar=f"COLVAR.{i}",
@@ -175,12 +175,13 @@ class OPES(MD):
                       'rg': calc.rg,
                       'rmsd': calc.rmsd,
                       'rmsf': calc.rmsf,
+                      'mindist': calc.mindist,
+                      'conv_params' : calc_conv.conv_params,
         }
                     #   'fes_kernels' : calc_fes.from_kernels,
-                    #   'kldiv' : calc_div.kldiv,
-                    #   'jsdiv' : calc_div.jsdiv,
-                    #   'dalonso' : calc_div.dalonso,
-                    #   'mindist': calc.mindist,
+                    #   'kldiv' : calc_conv.kldiv,
+                    #   'jsdiv' : calc_conv.jsdiv,
+                    #   'dalonso' : calc_conv.dalonso,
         
         # Run the requested function, with the given arguments
         value = dispatcher[key](*args, **kwargs)
@@ -193,6 +194,32 @@ class OPES(MD):
             setattr(self, alias, value)
             self.backpack.set(alias, value) if save else 0
 
+    def read(self,
+             key,
+             *args,
+             alias=None,
+             save=True,
+             **kwargs):
+        ''' Calculate anything for OPES class '''
+
+        # Available function in the calc module
+        dispatcher = {'dssp' : file_io.read_dssp,
+        }
+                    #   'fes_kernels' : calc_fes.from_kernels,
+                    #   'kldiv' : calc_conv.kldiv,
+                    #   'jsdiv' : calc_conv.jsdiv,
+                    #   'dalonso' : calc_conv.dalonso,
+        
+        # Run the requested function, with the given arguments
+        value = dispatcher[key](*args, **kwargs)
+        
+        # Set as variable within the function and (if needed) save in the backpack
+        if alias == None: 
+            setattr(self, key, value)
+            self.backpack.set(key, value) if save else 0
+        else:
+            setattr(self, alias, value)
+            self.backpack.set(alias, value) if save else 0
 
 class Walker(MD):
     ''' Instance for an OPES walker simulation. Building on/expanding on the MD class. '''

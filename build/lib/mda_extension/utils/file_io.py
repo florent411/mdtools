@@ -2,7 +2,11 @@
 
 ''' File in/out '''
 
+import numpy as np
 import pandas as pd
+
+# Included submodules
+import mda_extension.utils.tools as tools
 
 def read_colvar(root, walker_paths, colvar='COLVAR', labels=None, verbose=False):
     """Read COLVAR file(s) into dataframe.
@@ -113,7 +117,7 @@ def read_state(filename, verbose=False):
 
     return states_data, states_info
 
-def read_kernels(filename, verbose):
+def read_kernels(filename, verbose=False):
     """Read KERNELS file into dataframe.
 
     :param filename: path of KERNELS file. 
@@ -130,6 +134,56 @@ def read_kernels(filename, verbose):
 
     print(f"\t-> {filename}...", end="") if verbose else 0
     df = pd.read_csv(filename, names=column_names, delim_whitespace=True, comment="#")
+    print(f"done") if verbose else 0
+
+    return df
+
+
+def read_dssp(filenames, origins=None, numerical=False, verbose=False):
+    """Read DSSP file into dataframe.
+
+    :param filename: path of DSSP file.
+    :param numerical: Convert the structural components to a numerical value. (Default value = False)
+    :param verbose: Print what's happening. (Default value = False)
+
+    :returns: dataframe containing the DSSP data.
+
+    """
+
+    # If filenames is not a list, turn it into one.
+    if type(filenames) is not list:
+        filenames = [filenames]
+
+    dssp = []
+
+    for index, file in enumerate(filenames):
+
+        print(f"\t-> {file}...", end="") if verbose else 0
+        try:
+            with open(file, "r") as rf:
+                next(rf)
+                for line in rf:
+                    dssp.append([*line])
+        except FileNotFoundError:
+            print(f"ERROR: {file} not found. Create it using: gmx do_dssp -f trajectory.xtc -s topology.tpr -tu ns -ssdump dssp.dat -sc scount.xvg")
+            exit(1)
+
+        dssp = np.delete(np.array(dssp), -1, 1)
+
+        if numerical:
+            dssp = tools.convert_dssp_to_index(dssp)
+
+        df = pd.DataFrame(dssp)
+        df.columns += 1
+        df = df.add_prefix('res_')
+        df = df.reset_index().rename(columns={'index':'time'})
+        
+        # Add origin information
+        if origins != None:
+            df['origin'] = origins[index]
+        else:
+            df['origin'] = file.split('/')[-2]
+
     print(f"done") if verbose else 0
 
     return df
