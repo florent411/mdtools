@@ -2,6 +2,8 @@
 
 ''' File in/out '''
 
+import sys
+
 import numpy as np
 import pandas as pd
 
@@ -139,10 +141,10 @@ def read_kernels(filename, verbose=False):
     return df
 
 
-def read_dssp(filenames, origins=None, numerical=False, verbose=False):
+def read_dssp(universes, labels=None, numerical=False, verbose=False):
     """Read DSSP file into dataframe.
 
-    :param filename: path of DSSP file.
+    :param filename: system.
     :param numerical: Convert the structural components to a numerical value. (Default value = False)
     :param verbose: Print what's happening. (Default value = False)
 
@@ -150,15 +152,18 @@ def read_dssp(filenames, origins=None, numerical=False, verbose=False):
 
     """
 
-    # If filenames is not a list, turn it into one.
-    if type(filenames) is not list:
-        filenames = [filenames]
+    # Preprocess universes and labels.
+    # Turn into lists and make the labels fit the universes.
+    universes, labels = tools.prepare_ul(universes, labels)
 
-    dssp = []
+    filenames = [f"{universe.root}/dssp.dat" for universe in universes]
 
     for index, file in enumerate(filenames):
-
+        
+        dssp = []
+    
         print(f"\t-> {file}...", end="") if verbose else 0
+    
         try:
             with open(file, "r") as rf:
                 next(rf)
@@ -166,7 +171,7 @@ def read_dssp(filenames, origins=None, numerical=False, verbose=False):
                     dssp.append([*line])
         except FileNotFoundError:
             print(f"ERROR: {file} not found. Create it using: gmx do_dssp -f trajectory.xtc -s topology.tpr -tu ns -ssdump dssp.dat -sc scount.xvg")
-            exit(1)
+            sys.exit(1)
 
         dssp = np.delete(np.array(dssp), -1, 1)
 
@@ -179,10 +184,7 @@ def read_dssp(filenames, origins=None, numerical=False, verbose=False):
         df = df.reset_index().rename(columns={'index':'time'})
         
         # Add origin information
-        if origins != None:
-            df['origin'] = origins[index]
-        else:
-            df['origin'] = file.split('/')[-2]
+        df['origin'] = labels[index]
 
     print(f"done") if verbose else 0
 

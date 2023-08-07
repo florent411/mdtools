@@ -14,12 +14,8 @@ import checkarg.list as Guard
 
 # Included submodules from the mdtools package
 from backpack.main import Backpack
-
 from opes_postprocessing.utils import calc_fes , calc_conv
-
-from mda_extension.utils import tools
-from mda_extension.utils import file_io
-from mda_extension.utils import calc
+from mda_extension.utils import tools, file_io, calc
 
 # Other constants
 kb = 1.38064852e-23 # Boltzman's constant in m^2 kg s^-2 K^-1
