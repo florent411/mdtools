@@ -93,6 +93,34 @@ class MD(mda.Universe):
 
         self.backpack.set(key, value) if save else 0
 
+    def read(self,
+             key,
+             *args,
+             alias=None,
+             save=True,
+             **kwargs):
+        ''' Calculate anything for OPES class '''
+
+        # Available function in the calc module
+        dispatcher = {'dssp' : file_io.read_dssp,
+                      'xvg' : file_io.read_xvg,
+        }
+                    #   'fes_kernels' : calc_fes.from_kernels,
+                    #   'kldiv' : calc_conv.kldiv,
+                    #   'jsdiv' : calc_conv.jsdiv,
+                    #   'dalonso' : calc_conv.dalonso,
+        
+        # Run the requested function, with the given arguments
+        value = dispatcher[key](*args, **kwargs)
+        
+        # Set as variable within the function and (if needed) save in the backpack
+        if alias == None: 
+            setattr(self, key, value)
+            self.backpack.set(key, value) if save else 0
+        else:
+            setattr(self, alias, value)
+            self.backpack.set(alias, value) if save else 0
+
 
 class OPES(MD):
     ''' Instance for an OPES simulation. Building on/expanding on the MD class. '''
@@ -200,6 +228,7 @@ class OPES(MD):
 
         # Available function in the calc module
         dispatcher = {'dssp' : file_io.read_dssp,
+                      'xvg' : file_io.read_xvg,
         }
                     #   'fes_kernels' : calc_fes.from_kernels,
                     #   'kldiv' : calc_conv.kldiv,
