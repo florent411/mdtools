@@ -244,8 +244,6 @@ def get_column_names(filename):
 
     return column_names
 
-
-
 def kldiv(p, q):
     """Kullback-Leibler divergence D(P || Q) for discrete distributions
     
@@ -258,22 +256,6 @@ def kldiv(p, q):
     q = np.asarray(q, dtype=float)
 
     return np.sum(np.where(p != 0, p * np.log(p / q), 0))
-
-def dalonso(v1, v2):
-    """Alonso divergence (dA) - A Physically Meaningful Method for the Comparison of Potential Energy Functions
-    
-    Parameters
-    ----------
-    v1, v2 : array-like, dtype=float, shape=n
-    Discrete probability distributions.
-    """
-    v1 = np.asarray(v1, dtype=float)
-    v2 = np.asarray(v2, dtype=float)
-
-    v1_var, v2_var = v1.var(), v2.var()
-    r = np.corrcoef(v1, v2)[0,1]
-
-    return np.sqrt((v1_var + v2_var) * (1 - r**2))
 
 def jsdiv(p, q):
     """Jensen–Shannon divergence for measuring the similarity between two probability distributions. 
@@ -294,3 +276,19 @@ def jsdiv(p, q):
     Dqm = np.sum(np.where(q != 0, q * np.log(q / m), 0))
 
     return 0.5 * Dpm + 0.5 * Dqm
+
+def dalonso(v1, v2):
+    """Alonso divergence (dA) - A Physically Meaningful Method for the Comparison of Potential Energy Functions
+    
+    Parameters
+    ----------
+    v1, v2 : array-like, dtype=float, shape=n
+    Discrete probability distributions.
+    """
+    v1 = np.asarray(v1, dtype=float)
+    v2 = np.asarray(v2, dtype=float)
+
+    v1_var, v2_var = v1.var(), v2.var()
+    r = np.corrcoef(v1, v2)[0,1]
+
+    return np.sqrt((v1_var + v2_var) * (1 - r**2))

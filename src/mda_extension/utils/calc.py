@@ -9,6 +9,8 @@ from tqdm import tqdm
 import checkarg.list as Guard
 from MDAnalysis.analysis import rms, align, distances
 
+import mdtraj as md
+
 import time
 
 # Included submodules
@@ -163,6 +165,48 @@ def mindist(universes, labels=None, selection='protein', periodic=True):
         mindist = pd.DataFrame(np.array(dists), columns = ['time', 'mindist'])
         
         mindist['origin'] = labels[index]
+
+        df_list.append(mindist)
+
+    df = pd.concat(df_list, ignore_index=True)
+
+    # # Convert from AA to nm
+    # Not needed, as the distance is already in nm. 
+    # The data comes from an .xtc file, which is in nm.
+    # df['mindist'] /= 10
+
+    return df
+
+
+def dssp(universes, labels=None, numerical=True, simplified=False):
+    """Calculate DSSP secondary structure
+    
+    :param universes: list of the universes to analyse
+    :param labels: list of corresponding labels. If only one value is given, use it as a prefix. If empty just use numbers 0...n as labels. (Default value = None)
+    :param numerical: Convert the structural components to a numerical value. (Default value = False)
+    :param simplified: Use the simplified DSSP secondary structure. (Default value = False)
+    :param periodic: calculate minimum distance between periodic images. (Default value = True)
+
+    :returns: dataframe containing the DSSP data.
+    """
+
+    # Preprocess universes and labels.
+    # Turn into lists and make the labels fit the universes.
+    universes, labels = tools.prepare_ul(universes, labels)
+
+    # Check length of the lists
+    Guard.is_length_equals(labels, len(universes))
+
+    df_list = []
+    for index, universe in tqdm(enumerate(universes), total=len(universes), desc='Universes', position=0):        
+        # Create mdtraj.Trajectory
+        traj = md.Trajectory(universe.trajectory_path, top=universe.topology)
+
+        dssp_array = md.compute_dssp(traj, simplified=simplified)
+
+        dssp_df = pd.DataFrame(np.array(dssp_array), columns = ['res', 'ss'])
+        
+        dssp['origin'] = labels[index]
 
         df_list.append(mindist)
 

@@ -289,7 +289,7 @@ def timeseries(df,
                                 x=variables[0],
                                 y=variables[1],
                                 legend=False,
-                                shade=True,
+                                fill=True,
                                 cmap=palette,
                                 alpha=.3)
 

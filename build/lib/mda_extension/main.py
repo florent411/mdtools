@@ -36,14 +36,15 @@ class MD(mda.Universe):
         # Set own variables
         self.root = root
         self.verbose = verbose
+        self.topology = topology
 
         # Take over variables from the mda.Universe superclass.
         if trajectory:
             if type(trajectory) is not list:
                 trajectory = [trajectory]
 
-            trajectory = [f"{root}/{t}" for t in trajectory]
-            super().__init__(f"{root}/{topology}", trajectory)
+            self.trajectory_path = [f"{root}/{t}" for t in trajectory]
+            super().__init__(f"{root}/{topology}", self.trajectory_path)
         else:
             super().__init__(f"{root}/{topology}")
 
@@ -92,6 +93,34 @@ class MD(mda.Universe):
             setattr(self, alias, value)
 
         self.backpack.set(key, value) if save else 0
+
+    def read(self,
+             key,
+             *args,
+             alias=None,
+             save=True,
+             **kwargs):
+        ''' Calculate anything for OPES class '''
+
+        # Available function in the calc module
+        dispatcher = {'dssp' : file_io.read_dssp,
+                      'xvg' : file_io.read_xvg,
+        }
+                    #   'fes_kernels' : calc_fes.from_kernels,
+                    #   'kldiv' : calc_conv.kldiv,
+                    #   'jsdiv' : calc_conv.jsdiv,
+                    #   'dalonso' : calc_conv.dalonso,
+        
+        # Run the requested function, with the given arguments
+        value = dispatcher[key](*args, **kwargs)
+        
+        # Set as variable within the function and (if needed) save in the backpack
+        if alias == None: 
+            setattr(self, key, value)
+            self.backpack.set(key, value) if save else 0
+        else:
+            setattr(self, alias, value)
+            self.backpack.set(alias, value) if save else 0
 
 
 class OPES(MD):
@@ -200,6 +229,7 @@ class OPES(MD):
 
         # Available function in the calc module
         dispatcher = {'dssp' : file_io.read_dssp,
+                      'xvg' : file_io.read_xvg,
         }
                     #   'fes_kernels' : calc_fes.from_kernels,
                     #   'kldiv' : calc_conv.kldiv,

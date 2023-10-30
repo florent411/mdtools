@@ -36,14 +36,15 @@ class MD(mda.Universe):
         # Set own variables
         self.root = root
         self.verbose = verbose
+        self.topology = topology
 
         # Take over variables from the mda.Universe superclass.
         if trajectory:
             if type(trajectory) is not list:
                 trajectory = [trajectory]
 
-            trajectory = [f"{root}/{t}" for t in trajectory]
-            super().__init__(f"{root}/{topology}", trajectory)
+            self.trajectory_path = [f"{root}/{t}" for t in trajectory]
+            super().__init__(f"{root}/{topology}", self.trajectory_path)
         else:
             super().__init__(f"{root}/{topology}")
 
