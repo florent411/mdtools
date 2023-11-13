@@ -88,7 +88,9 @@ def rg(universes, labels=None):
     
     return df
 
-def rmsf(universes, labels=None, selection='protein and name CA'):
+def rmsf(universes,
+         labels=None,
+         selection='protein and name CA'):
     """Calculate root-mean square fluctuation per residue (rmsf)
     
     :param universes: list of the universes to analyse
@@ -129,7 +131,10 @@ def rmsf(universes, labels=None, selection='protein and name CA'):
 
     return df
 
-def mindist(universes, labels=None, selection='protein', periodic=True):
+def mindist(universes,
+            labels=None,
+            selection='protein',
+            periodic=True):
     """Calculate minimum distance between atoms
     
     :param universes: list of the universes to analyse
@@ -178,7 +183,10 @@ def mindist(universes, labels=None, selection='protein', periodic=True):
     return df
 
 
-def dssp(universes, labels=None, numerical=True, simplified=False):
+def dssp(universes,
+         labels=None,
+         numerical=True,
+         simplified=False):
     """Calculate DSSP secondary structure
     
     :param universes: list of the universes to analyse

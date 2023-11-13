@@ -3,6 +3,8 @@
 import os
 import numpy as np
 import pandas as pd
+from dotmap import DotMap
+from datetime import date
 
 # MD Analysis
 import MDAnalysis as mda
@@ -69,59 +71,6 @@ class MD(mda.Universe):
         for key in self.backpack.content.keys():
             setattr(self, key, self.backpack.get(key))
 
-    def calc(self,
-             key,
-             *args,
-             alias=None,
-             save=True,
-             **kwargs):
-        ''' Calculate anything for MD class '''
-
-        # Available function in the calc module
-        dispatcher = {'rmsd': calc.rmsd,
-                      'rg': calc.rg,
-                      'rmsf': calc.rmsf,
-                      'mindist': calc.mindist}
-        
-        # Run the requested function, with the given arguments
-        value = dispatcher[key](*args, **kwargs)
-        
-        # Set as variable within the function and (if needed) save in the backpack
-        if alias == None: 
-            setattr(self, key, value)
-        else:
-            setattr(self, alias, value)
-
-        self.backpack.set(key, value) if save else 0
-
-    def read(self,
-             key,
-             *args,
-             alias=None,
-             save=True,
-             **kwargs):
-        ''' Calculate anything for OPES class '''
-
-        # Available function in the calc module
-        dispatcher = {'dssp' : file_io.read_dssp,
-                      'xvg' : file_io.read_xvg,
-        }
-                    #   'fes_kernels' : calc_fes.from_kernels,
-                    #   'kldiv' : calc_conv.kldiv,
-                    #   'jsdiv' : calc_conv.jsdiv,
-                    #   'dalonso' : calc_conv.dalonso,
-        
-        # Run the requested function, with the given arguments
-        value = dispatcher[key](*args, **kwargs)
-        
-        # Set as variable within the function and (if needed) save in the backpack
-        if alias == None: 
-            setattr(self, key, value)
-            self.backpack.set(key, value) if save else 0
-        else:
-            setattr(self, alias, value)
-            self.backpack.set(alias, value) if save else 0
-
 
 class OPES(MD):
     ''' Instance for an OPES simulation. Building on/expanding on the MD class. '''
@@ -130,7 +79,7 @@ class OPES(MD):
                  root=os.getcwd(),
                  topology='run.pdb',
                  trajectory=None,
-                 walker_prefix=None,
+                 walker_prefix='walker',
                  colvar='COLVAR',
                  state='STATE',
                  kernels='KERNELS',
@@ -163,9 +112,20 @@ class OPES(MD):
             
         # Load OPES specific output files into dataframes
         print("\nReading plumed files:") if self.verbose else 0
-        self.colvar = file_io.read_colvar(self.root, self.walker_paths, colvar, labels=walker_prefix, verbose=self.verbose)
-        self.state_data, self.state_info = file_io.read_state(f"{self.root}/{self.walker_paths[0]}/{state}", verbose=self.verbose)
-        self.kernels = file_io.read_kernels(f"{self.root}/{self.walker_paths[0]}/{kernels}", verbose=self.verbose)
+
+        # Load files if they were not in the backpack and add them.
+        if not hasattr(self, 'colvar'):
+            self.colvar = file_io.read_colvar(self.root, self.walker_paths, colvar, labels=walker_prefix, verbose=self.verbose)
+            self.backpack.set('colvar', self.colvar)
+
+        if not (hasattr(self, 'state_data') and hasattr(self, 'state_info')):
+            self.state_data, self.state_info = file_io.read_state(f"{self.root}/{self.walker_paths[0]}/{state}", verbose=self.verbose)
+            self.backpack.set('state_data', self.state_data)
+            self.backpack.set('state_info', self.state_info)
+
+        if not hasattr(self, 'kernels'):
+            self.kernels = file_io.read_kernels(f"{self.root}/{self.walker_paths[0]}/{kernels}", verbose=self.verbose)
+            self.backpack.set('kernels', self.kernels)
 
         # If multiple walkers, make a list containing the walkers as a new MD object
         if self.n_walkers > 1:
@@ -185,10 +145,9 @@ class OPES(MD):
                 print(f"done") if self.verbose else 0
 
     def calc(self,
-             key,
+             order_param,
              *args,
-             alias=None,
-             save=True,
+             key_string=None,
              **kwargs):
         ''' Calculate anything for OPES class '''
 
@@ -209,15 +168,43 @@ class OPES(MD):
                     #   'dalonso' : calc_conv.dalonso,
         
         # Run the requested function, with the given arguments
-        value = dispatcher[key](*args, **kwargs)
+        value = dispatcher[order_param](*args, **kwargs)
         
-        # Set as variable within the function and (if needed) save in the backpack
-        if alias == None: 
-            setattr(self, key, value)
-            self.backpack.set(key, value) if save else 0
+        # Add to  as variable within the function and (if needed) save in the backpack
+        if key_string == 'timeseries':
+            if not 'timeseries' in self.backpack.content:
+                self.backpack.set('timeseries', value)
+                setattr(self, 'timeseries', value)
+            else:
+                merged_df = pd.merge(self.backpack.get('timeseries'),
+                                     value,
+                                     on=['time', 'origin'],
+                                     suffixes=['', f'_{date.today().strftime("%Y%m%d")}'], how='outer')
+                                     
+                self.backpack.set('timeseries', merged_df)
+                setattr(self, 'timeseries', merged_df)
+        elif len(key_string.split('.')) > 1:
+            p_type = key_string.split('.')[0]
+            if not p_type in self.backpack.content:
+                dm = DotMap()
+            else:
+                dm = self.backpack.get(p_type)
+
+            # Add the value to the dotmap
+            keys = key_string.split('.')
+            
+            # Get to the right dotmap depth
+            current_level = dm
+            for key in keys[1:-1]:
+                current_level = current_level[key]
+
+            current_level[keys[-1]] = value
+
+            self.backpack.set(p_type, dm)
+            setattr(self, p_type, dm)
         else:
-            setattr(self, alias, value)
-            self.backpack.set(alias, value) if save else 0
+            self.backpack.set(key_string, value)
+            setattr(self, key_string, value)
 
     def read(self,
              key,
