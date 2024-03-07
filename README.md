@@ -39,3 +39,10 @@ For a more detailed description, see [this README file](src/opes_postprocessing/
 
 For a short tutorial, see [this notebook](sample/opes_postprocessing.ipynb).
 
+## conserved_atoms
+
+For a more detailed description, see [this README file](src/conserved_atoms/README.md).
+
+For a short tutorial, see [this notebook](sample/conserved_atoms.ipynb).
+
+
